@@ -4,7 +4,9 @@ import type { MenuCommand, Session } from "../shared/types";
 import { CalendarSync } from "./calendar";
 import { ClaudeRunner } from "./claude-runner";
 import { MailSync } from "./mail";
+import { listMcpServers } from "./mcp-client";
 import { RailwayMonitor } from "./railway";
+import { TicketsMonitor } from "./tickets";
 import { listBrowsers, SettingsStore } from "./settings";
 import { PtyManager } from "./pty-manager";
 import { loadSession, saveSession } from "./session-store";
@@ -23,6 +25,10 @@ const prod = new RailwayMonitor(
   () => settings.current.railway,
   (state) => win?.webContents.send("prod:state", state),
 );
+const tickets = new TicketsMonitor(
+  () => settings.current.tickets,
+  (state) => win?.webContents.send("tickets:state", state),
+);
 const claude = new ClaudeRunner();
 const calendar = new CalendarSync(claude, (state) => win?.webContents.send("calendar:state", state));
 const mail = new MailSync(
@@ -36,8 +42,12 @@ ipcMain.handle("settings:set", async (_e, patch) => {
   const next = await settings.update(patch);
   // Cambiar qué proyectos se vigilan se refleja en el indicador sin esperar al próximo ciclo.
   if (patch.railway) void prod.check();
+  if (patch.tickets) void tickets.check();
   return next;
 });
+ipcMain.handle("tickets:get", () => tickets.current);
+ipcMain.on("tickets:refresh", () => void tickets.check());
+ipcMain.handle("tickets:servers", async () => (await listMcpServers()).map((s) => s.name));
 ipcMain.handle("prod:get", () => prod.current);
 ipcMain.on("prod:refresh", () => void prod.check());
 // Usa la lista en memoria del monitor (se refresca sola cada 30 min): así Configuración abre al instante.
@@ -188,6 +198,7 @@ app.whenReady().then(async () => {
   calendar.start();
   void mail.start();
   prod.start();
+  tickets.start();
   app.on("activate", () => {
     if (!win) createWindow();
   });

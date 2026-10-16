@@ -154,7 +154,11 @@ body { display: flex; flex-direction: column; }
 
 /* ---------- paneles de arriba (agenda, correo) ---------- */
 .panel { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; padding: 10px 14px; overflow: hidden; }
-.panel + .panel { border-left: 1px solid #000; }
+/* Columna izquierda: agenda arriba, tickets abajo. A la derecha, el correo. */
+#left { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid #000; }
+#left > .panel { min-height: 0; }
+#left > .panel + .panel { border-top: 1px solid #000; }
+#left > .panel[hidden] { display: none; }
 
 .panel-head { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .panel-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
@@ -459,3 +463,45 @@ pre.detail[hidden] { display: none; }
 #settings .rw-projects small { color: var(--text-muted); }
 #settings section.flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0%, 30% { background: #0064c833; } 100% { background: transparent; } }
+
+/* ---------- tickets ---------- */
+.tk-env { padding: 1px 6px; border-radius: 3px; background: #d9a44133; color: #d9a441; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.tk-env.prod { background: #5ab37a33; color: #5ab37a; }
+.tk-env[hidden] { display: none; }
+.tk-tabs { display: flex; gap: 2px; }
+.tk-tab { height: 22px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--text-muted); font: inherit; font-variant-numeric: tabular-nums; }
+.tk-tab:hover { background: #ffffff1a; color: var(--text); }
+.tk-tab.on { background: #ffffff1f; color: var(--text); font-weight: 600; }
+.tk-note { margin: 6px 0 0; color: var(--text-muted); font-size: 11px; }
+.tk-note[hidden] { display: none; }
+.tk-table-wrap { margin-top: 8px; overflow: auto; min-height: 0; }
+.tk-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tk-table[hidden] { display: none; }
+.tk-table th { position: sticky; top: 0; background: var(--bg); text-align: left; font-weight: 600; color: var(--text-muted); font-size: 11px; padding: 4px 6px; border-bottom: 1px solid #ffffff1a; }
+.tk-table td { padding: 5px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid #ffffff0a; color: var(--text-muted); }
+.tk-table tbody tr { cursor: default; }
+.tk-table tbody tr:hover td { background: #ffffff0d; }
+.tk-table tr.sla td { background: #e0675a14; }
+.tk-table th:nth-child(1) { width: 44px; }
+.tk-table th:nth-child(3) { width: 74px; }
+.tk-table th:nth-child(4) { width: 68px; }
+.tk-table th:nth-child(5) { width: 14%; }
+.tk-table th:nth-child(6) { width: 12%; }
+.tk-table th:nth-child(7) { width: 44px; }
+/* En "Míos" todos los atendés vos: la columna sobra. */
+.tk-table.hide-who th:nth-child(6), .tk-table.hide-who td:nth-child(6) { display: none; }
+.tk-num { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.tk-subject { color: var(--text) !important; }
+.tk-subject em { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 5px; margin-right: 6px; border-radius: 3px; background: #e0675a; color: #fff; }
+.tk-who.none { color: #d9a441 !important; }
+.tk-age { font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; padding: 1px 6px; border-radius: 9px; font-size: 10px; font-weight: 600; background: #ffffff14; color: var(--text-muted); }
+.chip.st-open { background: #3b8eea26; color: #6aaef0; }
+.chip.st-in_progress { background: #5ab37a26; color: #5ab37a; }
+.chip.st-waiting { background: #d9a44126; color: #d9a441; }
+.chip.pr-urgent { background: #e0675a; color: #fff; }
+.chip.pr-high { background: #e0675a33; color: #e98a80; }
+.chip.pr-medium { background: #ffffff14; color: var(--text-muted); }
+.chip.pr-low { background: transparent; color: var(--text-muted); }
+#settings .tk-server-row[hidden] { display: none; }
+#tickets .panel-head > .panel-status { flex-shrink: 0; }

@@ -11,6 +11,7 @@ const DEFAULTS: Settings = {
   browser: { appPath: null, profile: null },
   pomodoro: { ticking: true, bell: true, volume: 0.6 },
   railway: { enabled: true, projects: null },
+  tickets: { enabled: true, server: null },
 };
 
 /**
@@ -50,6 +51,7 @@ export class SettingsStore {
         browser: { ...DEFAULTS.browser, ...saved.browser },
         pomodoro: { ...DEFAULTS.pomodoro, ...saved.pomodoro },
         railway: { ...DEFAULTS.railway, ...saved.railway },
+        tickets: { ...DEFAULTS.tickets, ...saved.tickets },
       };
     } catch {
       // Primera vez o archivo corrupto: valores por defecto.

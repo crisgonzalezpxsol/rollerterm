@@ -54,6 +54,11 @@ export interface RollertermApi {
   refreshProd(): void;
   onProd(cb: (state: ProdState) => void): void;
   listRailwayProjects(): Promise<RailwayProject[]>;
+  getTickets(): Promise<TicketsState>;
+  refreshTickets(): void;
+  onTickets(cb: (state: TicketsState) => void): void;
+  /** Servidores MCP por stdio configurados en Claude Code (para elegir el de tickets). */
+  listMcpServers(): Promise<string[]>;
 }
 
 /** Un evento de Google Calendar tal como lo devuelve Claude Code. */
@@ -166,6 +171,7 @@ export interface Settings {
   browser: BrowserChoice;
   pomodoro: PomodoroSound;
   railway: RailwaySettings;
+  tickets: TicketsSettings;
 }
 
 export interface BrowserInfo {
@@ -210,4 +216,43 @@ export interface RailwayProject {
   name: string;
   /** Cantidad de servicios del proyecto. */
   services: number;
+}
+
+export type TicketStatus = "OPEN" | "IN_PROGRESS" | "WAITING" | "CLOSED";
+export type TicketPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+
+/** Un ticket de soporte de Pxsol Agencias, tal como lo lista su MCP. */
+export interface Ticket {
+  numero: number;
+  numeroEnNexus: number | null;
+  asunto: string;
+  estado: TicketStatus;
+  prioridad: TicketPriority;
+  agencia: string | null;
+  atiende: string | null;
+  comentarios: number;
+  /** ISO. */
+  creadoEl: string;
+  slaVencido: boolean;
+  /** true si está asignado a quien usa la app. */
+  mine: boolean;
+}
+
+export interface TicketsState {
+  status: "loading" | "ok" | "disabled" | "not-configured" | "error";
+  message: string | null;
+  checking: boolean;
+  lastCheck: number | null;
+  /** Tickets sin cerrar. */
+  tickets: Ticket[];
+  /** Base de la web de Agencias, para abrir cada ticket ("https://testing.pxsolagencias.com"). */
+  webUrl: string | null;
+  /** "producción" o el subdominio ("testing"), para que se note contra qué entorno se mira. */
+  environment: string | null;
+}
+
+export interface TicketsSettings {
+  enabled: boolean;
+  /** Nombre del servidor MCP en ~/.claude.json; null = el primero que parezca de tickets. */
+  server: string | null;
 }

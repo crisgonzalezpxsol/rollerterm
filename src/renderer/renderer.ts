@@ -9,6 +9,7 @@ import { mountMail } from "./mail";
 import { mountPomodoro } from "./pomodoro";
 import { mountProd } from "./prod";
 import { mountSettings } from "./settings";
+import { mountTickets } from "./tickets";
 
 declare global {
   interface Window {
@@ -44,6 +45,7 @@ const pomodoro = mountPomodoro(
 );
 mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 mountMail(document.getElementById("mail") as HTMLElement, api);
+mountTickets(document.getElementById("tickets") as HTMLElement, api);
 const settingsPanel = mountSettings(api, {
   onClose: () => active?.term.focus(),
   onChange: (s) => (settings = s),

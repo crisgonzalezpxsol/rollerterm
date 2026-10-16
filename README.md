@@ -4,6 +4,7 @@ App de escritorio (macOS) con dos mitades:
 
 - **Arriba, a la izquierda, la agenda:** tus reuniones de Google Calendar de las próximas 24 h,
   con aviso 5 minutos antes y al empezar cada llamada, y un botón para unirte.
+- **Debajo de la agenda, los tickets** de Pxsol Agencias: tuyos, sin dueño y todos los abiertos.
 - **Arriba, a la derecha, el correo:** tu bandeja de entrada de Gmail (leídos y no leídos), aviso
   de los nuevos, direcciones importantes y bloqueadas, y un resumen cada 3 horas de lo que
   mandaron las importantes.
@@ -25,6 +26,7 @@ Lleva unos 10 minutos. Se hace una sola vez.
 | Node.js 20 o más nuevo | `node -v` | Bajalo de [nodejs.org](https://nodejs.org) (versión LTS) o `brew install node` |
 | Claude Code | `claude --version` | `curl -fsSL https://claude.ai/install.sh \| bash` y abrí una terminal nueva |
 | Cuenta de Claude (Pro, Max, Team o Enterprise) | — | La agenda usa los conectores de claude.ai; una API key sola no alcanza. |
+| MCP de tickets de pxsol-agencias (opcional, para el panel de tickets) | `claude mcp list` muestra el servidor de tickets | Ver `scripts/mcp-tickets/README.md` en el repo pxsol-agencias |
 | Railway CLI (opcional, para el indicador de producción) | `railway whoami` | `npm i -g @railway/cli` y después `railway login` |
 
 ### 2. Loguear Claude Code con tu cuenta de claude.ai
@@ -85,6 +87,7 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 | Marcar un remitente como importante / bloquearlo | pasá el mouse por el correo → `★` / `🚫` |
 | Editar direcciones importantes y bloqueadas | botón **Direcciones** (acepta direcciones o dominios enteros: `empresa.com`) |
 | Resumir lo de las importantes ahora | botón **Resumir** (últimas 24 h) |
+| Abrir un ticket | clic en la fila (se abre en Pxsol Agencias) |
 | Ver qué servicios de producción no están OK | clic en **Prod N/M** arriba a la derecha (clic en un servicio lo abre en Railway) |
 | Configuración | ⚙ arriba a la derecha · `⌘,` |
 | Pomodoro: iniciar / pausar | clic en 🍅 (arriba a la derecha) · `⌘⇧P` |
@@ -128,6 +131,21 @@ prohibido explícitamente. Se usa el modelo Haiku y se bloquean los demás conec
 consulta sea liviana. Uso aproximado de tu plan: agenda ~US$0,005 cada 10 min, correo ~US$0,015
 por revisión, y cada resumen ~US$0,05.
 
+### Tickets (Pxsol Agencias)
+
+Tabla debajo de la agenda con los tickets sin cerrar, en tres pestañas: **Míos**, **Sin dueño**
+y **Abiertos** (con la cantidad de cada una). Van primero los de SLA vencido, después por
+prioridad y después los más nuevos. Un clic abre el ticket en la web de Agencias.
+
+- Se revisa cada 3 minutos y al despertar la Mac.
+- Avisa cuando te asignan un ticket nuevo y cuando a uno tuyo se le vence el SLA.
+- La etiqueta junto al título muestra contra qué entorno se mira (**TESTING** o **PRODUCCIÓN**),
+  según el `AGENCIAS_WEB_URL` del servidor MCP.
+- Usa el **MCP de tickets** de pxsol-agencias tal como está configurado en Claude Code
+  (`~/.claude.json`), lanzándolo directo y solo con `listar_tickets`: no pasa por Claude ni
+  escribe nada. En Configuración → Tickets se elige el servidor (por defecto, el primero que
+  parezca de tickets) o se oculta el panel.
+
 ### Producción (Railway)
 
 El indicador **Prod N/M** de la barra de título muestra cuántos servicios del entorno
@@ -156,6 +174,7 @@ Con ⚙ o `⌘,`. Los cambios se guardan al instante en
   (por ejemplo, el de la cuenta del trabajo, para que Meet y Gmail abran con esa cuenta). **Probar**
   abre Google Calendar con lo elegido.
 - **Pomodoro:** tictac sí/no, timbre sí/no y volumen.
+- **Tickets:** mostrar u ocultar el panel y qué servidor MCP usar.
 - **Producción (Railway):** mostrar u ocultar el indicador y qué proyectos vigilar.
 
 ### Pomodoro
@@ -183,6 +202,7 @@ el cartel, la app reintenta una vez sola: los conectores de claude.ai a veces tr
 | **Google Calendar / Gmail desconectado** | En una pestaña: `claude` → `/mcp` → **claude.ai Google Calendar** (o **Gmail**) **→ Authenticate**. Después `↻`. |
 | **Error al leer…** con "Not logged in" | La sesión de Claude Code expiró: corré `claude` en una pestaña, logueate y tocá `↻`. |
 | No llegan notificaciones | Configuración del Sistema → Notificaciones → rollerterm → permitir. Revisá también que no esté activo "No molestar". |
+| Tickets: **MCP de tickets no configurado** | Configurá el servidor de tickets de pxsol-agencias en Claude Code o elegilo en Configuración → Tickets. |
 | Indicador **Prod ?** | Pasá el mouse para ver el motivo. Casi siempre es el CLI: instalalo (`npm i -g @railway/cli`) o renová la sesión con `railway login`. |
 | En la barra de menú dice "Electron" en vez de "rollerterm" | Corré `npm run postinstall` (renombra el Electron que trae npm) y reabrí la app. |
 | **`posix_spawnp failed`** al abrir una pestaña | npm instala el `spawn-helper` de node-pty sin permiso de ejecución. Corré `npm run postinstall`. |
@@ -196,7 +216,8 @@ Electron + [xterm.js](https://xtermjs.org) + [node-pty](https://github.com/micro
 ```
 src/main/       proceso principal: ventana, menú/atajos, una shell (pty) por pestaña, sesión,
                 agenda y correo vía Claude Code (claude-runner.ts, calendar.ts, mail.ts),
-                producción vía Railway CLI (railway.ts), configuración (settings.ts)
+                producción vía Railway CLI (railway.ts), tickets vía su MCP (tickets.ts,
+                mcp-client.ts), configuración (settings.ts)
 src/preload/    puente aislado: expone window.rollerterm a la ventana (sin Node en el renderer)
 src/renderer/   la ventana: agenda, correo, pomodoro, barra de pestañas y una terminal xterm por pestaña
 src/shared/     tipos compartidos (Session, CalendarState, MailState, MenuCommand, RollertermApi)

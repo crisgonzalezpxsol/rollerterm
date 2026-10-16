@@ -2,7 +2,7 @@
 import type { BrowserInfo, PomodoroSound, RailwayProject, RollertermApi, Settings } from "../shared/types";
 import { bell, tick } from "./sound";
 
-export type SettingsSection = "railway";
+export type SettingsSection = "railway" | "tickets";
 
 export interface SettingsPanel {
   /** Con `section`, abre directo en esa sección y la resalta. */
@@ -39,6 +39,12 @@ export function mountSettings(
         <button class="pomo-test">Probar sonido</button>
       </div>
     </section>
+    <section data-section="tickets">
+      <h3>Tickets (Pxsol Agencias)</h3>
+      <p class="settings-help">Tabla debajo de la agenda. Usa el MCP de tickets que tengas configurado en Claude Code, solo para leer.</p>
+      <label class="check"><input type="checkbox" class="tk-enabled" /> Mostrar el panel de tickets</label>
+      <label class="tk-server-row">Servidor MCP <select class="tk-server"></select></label>
+    </section>
     <section data-section="railway">
       <h3>Producción (Railway)</h3>
       <p class="settings-help">Indicador en la barra de título con la salud del entorno «production». Usa el CLI de Railway con tu sesión.</p>
@@ -63,6 +69,9 @@ export function mountSettings(
   const rwEnabled = $<HTMLInputElement>(".rw-enabled");
   const rwProjects = $<HTMLDivElement>(".rw-projects");
   let railwayProjects: RailwayProject[] = [];
+  let mcpServers: string[] = [];
+  const tkEnabled = $<HTMLInputElement>(".tk-enabled");
+  const tkServer = $<HTMLSelectElement>(".tk-server");
   /** false hasta la primera respuesta: lista vacía no significa "no hay proyectos" todavía. */
   let projectsLoaded = false;
 
@@ -96,6 +105,14 @@ export function mountSettings(
     tickingBox.checked = settings.pomodoro.ticking;
     bellBox.checked = settings.pomodoro.bell;
     volumeRange.value = String(settings.pomodoro.volume);
+
+    tkEnabled.checked = settings.tickets.enabled;
+    $<HTMLLabelElement>(".tk-server-row").hidden = !settings.tickets.enabled;
+    tkServer.replaceChildren(option("", "Automático (el primero de tickets)"), ...mcpServers.map((n) => option(n, n)));
+    if (settings.tickets.server && !mcpServers.includes(settings.tickets.server)) {
+      tkServer.append(option(settings.tickets.server, `${settings.tickets.server} (no encontrado)`));
+    }
+    tkServer.value = settings.tickets.server ?? "";
 
     rwEnabled.checked = settings.railway.enabled;
     rwProjects.hidden = !settings.railway.enabled;
@@ -164,6 +181,8 @@ export function mountSettings(
 
   $<HTMLButtonElement>(".rw-all").addEventListener("click", () => void save({ railway: { enabled: true, projects: null } }));
   $<HTMLButtonElement>(".rw-none").addEventListener("click", () => void save({ railway: { enabled: true, projects: [] } }));
+  tkEnabled.addEventListener("change", () => void save({ tickets: { enabled: tkEnabled.checked, server: settings!.tickets.server } }));
+  tkServer.addEventListener("change", () => void save({ tickets: { enabled: true, server: tkServer.value || null } }));
   rwEnabled.addEventListener("change", () => {
     void save({ railway: { enabled: rwEnabled.checked, projects: settings!.railway.projects } });
   });
@@ -189,10 +208,11 @@ export function mountSettings(
         void el.offsetWidth; // reinicia la animación si ya estaba
         el.classList.add("flash");
       }
-      [settings, browsers, railwayProjects] = await Promise.all([
+      [settings, browsers, railwayProjects, mcpServers] = await Promise.all([
         api.getSettings(),
         api.listBrowsers(),
         api.listRailwayProjects(),
+        api.listMcpServers(),
       ]);
       projectsLoaded = true;
       render();
