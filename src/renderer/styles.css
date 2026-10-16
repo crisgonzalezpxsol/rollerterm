@@ -145,8 +145,36 @@ body { display: flex; flex-direction: column; }
 }
 #pomodoro button:hover { background: #ffffff1a; }
 .pomo-display { padding: 0 8px; }
-.pomo-reset { width: 24px; font-size: 14px; }
-.pomo-reset[hidden] { display: none; }
+#pomodoro { position: relative; }
+.pomo-menu {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  z-index: 20;
+  min-width: 230px;
+  padding: 4px;
+  border: 1px solid #ffffff26;
+  border-radius: 8px;
+  background: var(--bar);
+  box-shadow: 0 12px 40px #0009;
+}
+.pomo-menu[hidden] { display: none; }
+#pomodoro .pomo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  color: var(--text);
+  text-align: left;
+}
+#pomodoro .pomo-item small { color: var(--text-muted); font-size: 11px; }
+#pomodoro .pomo-item.current { color: var(--pomo); font-weight: 600; }
+#pomodoro .pomo-item span { white-space: nowrap; }
+#pomodoro .pomo-item.current small { color: var(--pomo); }
+.pomo-sep { margin: 4px 6px; border: 0; border-top: 1px solid #ffffff1a; }
 
 #panes { position: relative; flex: 1; min-height: 0; }
 .pane { position: absolute; inset: 0; padding: 6px 0 0 8px; display: none; }

@@ -93,8 +93,8 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 | Notas (abrir / cerrar el panel lateral) | 📝 arriba a la derecha · `⌘⇧N` · `Esc` o `⌘W` lo cierran |
 | Silenciar sonidos y avisos | 🔔/🔕 arriba a la derecha · `⌘⇧M` |
 | Configuración | ⚙ arriba a la derecha · `⌘,` |
-| Pomodoro: iniciar / pausar | clic en 🍅 (arriba a la derecha) · `⌘⇧P` |
-| Pomodoro: reiniciar | `↺` junto al reloj · menú Pomodoro → Reiniciar |
+| Pomodoro: menú (pausar, ir a foco / descanso / gracia, siguiente fase, reiniciar) | clic en 🍅 o en el reloj (arriba a la derecha) |
+| Pomodoro: pausar / continuar directo | `⌘⇧P` |
 
 ### Agenda
 
@@ -201,7 +201,9 @@ empezar el descanso, uno suave al empezar la gracia y *ding-ding* al volver a tr
 o se ajusta el volumen en Configuración → Pomodoro (con **Probar sonido**).
 
 25 min de foco → 5 min de descanso → 1 min de gracia para acomodarse → foco otra vez, en ciclo,
-con una notificación en cada cambio de fase.
+con una notificación en cada cambio de fase. Un clic en el reloj abre un menú para pausar o
+continuar, ir directo a foco, descanso o gracia (arranca esa fase de cero), pasar a la siguiente
+fase o reiniciar.
 
 La sesión de pestañas se guarda en `~/Library/Application Support/rollerterm/session.json`.
 
