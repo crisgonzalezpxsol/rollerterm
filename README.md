@@ -1,4 +1,4 @@
-# tabterm
+# rollerterm
 
 Terminal de escritorio (macOS) con pestañas con nombre: una pestaña por ticket o
 por funcionalidad. Las pestañas, sus nombres y el directorio donde quedó cada una
@@ -20,7 +20,7 @@ npm start       # compila y abre la app
 | Reordenar | arrastrar la pestaña |
 | Reabrir una shell que terminó | Enter dentro de la pestaña (conserva el nombre) |
 
-La sesión se guarda en `~/Library/Application Support/tabterm/session.json`.
+La sesión se guarda en `~/Library/Application Support/rollerterm/session.json`.
 
 ## Arquitectura
 
@@ -29,9 +29,9 @@ Electron + [xterm.js](https://xtermjs.org) + [node-pty](https://github.com/micro
 
 ```
 src/main/       proceso principal: ventana, menú/atajos, una shell (pty) por pestaña, sesión
-src/preload/    puente aislado: expone window.tabterm a la ventana (sin Node en el renderer)
+src/preload/    puente aislado: expone window.rollerterm a la ventana (sin Node en el renderer)
 src/renderer/   la ventana: barra de pestañas y una terminal xterm por pestaña
-src/shared/     tipos compartidos (Session, MenuCommand, TabtermApi)
+src/shared/     tipos compartidos (Session, MenuCommand, RollertermApi)
 ```
 
 ## Tropiezos conocidos

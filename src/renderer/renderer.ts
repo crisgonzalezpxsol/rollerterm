@@ -3,15 +3,15 @@ import "./styles.css";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import type { MenuCommand, Session, TabtermApi } from "../shared/types";
+import type { MenuCommand, Session, RollertermApi } from "../shared/types";
 
 declare global {
   interface Window {
-    tabterm: TabtermApi;
+    rollerterm: RollertermApi;
   }
 }
 
-const api = window.tabterm;
+const api = window.rollerterm;
 
 interface Tab {
   id: string;

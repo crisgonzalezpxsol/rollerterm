@@ -4,7 +4,7 @@ import type { MenuCommand, Session } from "../shared/types";
 import { PtyManager } from "./pty-manager";
 import { loadSession, saveSession } from "./session-store";
 
-app.setName("tabterm");
+app.setName("rollerterm");
 
 let win: BrowserWindow | null = null;
 

@@ -20,8 +20,8 @@ export type MenuCommand =
   | "prev-tab"
   | `goto-tab:${number}`;
 
-/** API que el preload expone a la ventana como `window.tabterm`. */
-export interface TabtermApi {
+/** API que el preload expone a la ventana como `window.rollerterm`. */
+export interface RollertermApi {
   createPty(id: string, cwd: string, cols: number, rows: number): Promise<void>;
   write(id: string, data: string): void;
   resize(id: string, cols: number, rows: number): void;

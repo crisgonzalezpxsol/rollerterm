@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { MenuCommand, Session, TabtermApi } from "../shared/types";
+import type { MenuCommand, Session, RollertermApi } from "../shared/types";
 
-const api: TabtermApi = {
+const api: RollertermApi = {
   createPty: (id, cwd, cols, rows) => ipcRenderer.invoke("pty:create", id, cwd, cols, rows),
   write: (id, data) => ipcRenderer.send("pty:write", id, data),
   resize: (id, cols, rows) => ipcRenderer.send("pty:resize", id, cols, rows),
@@ -14,4 +14,4 @@ const api: TabtermApi = {
   onMenu: (cb) => ipcRenderer.on("menu", (_e, cmd: MenuCommand) => cb(cmd)),
 };
 
-contextBridge.exposeInMainWorld("tabterm", api);
+contextBridge.exposeInMainWorld("rollerterm", api);

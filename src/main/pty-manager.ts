@@ -22,7 +22,7 @@ export class PtyManager {
       cols,
       rows,
       cwd: dir,
-      env: { ...process.env, TERM_PROGRAM: "tabterm" } as Record<string, string>,
+      env: { ...process.env, TERM_PROGRAM: "rollerterm" } as Record<string, string>,
     });
     proc.onData((data) => this.onData(id, data));
     proc.onExit(({ exitCode }) => {
