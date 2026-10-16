@@ -21,6 +21,7 @@ export type MenuCommand =
   | "pomodoro-toggle"
   | "pomodoro-reset"
   | "open-settings"
+  | "toggle-notes"
   | `goto-tab:${number}`;
 
 /** API que el preload expone a la ventana como `window.rollerterm`. */
@@ -59,6 +60,9 @@ export interface RollertermApi {
   onTickets(cb: (state: TicketsState) => void): void;
   /** Servidores MCP por stdio configurados en Claude Code (para elegir el de tickets). */
   listMcpServers(): Promise<string[]>;
+  listNotes(): Promise<Note[]>;
+  saveNote(note: Note): Promise<void>;
+  deleteNote(id: string): Promise<void>;
 }
 
 /** Un evento de Google Calendar tal como lo devuelve Claude Code. */
@@ -255,4 +259,12 @@ export interface TicketsSettings {
   enabled: boolean;
   /** Nombre del servidor MCP en ~/.claude.json; null = el primero que parezca de tickets. */
   server: string | null;
+}
+
+/** Una nota del panel lateral. El título es su primera línea. */
+export interface Note {
+  id: string;
+  text: string;
+  createdAt: number;
+  updatedAt: number;
 }

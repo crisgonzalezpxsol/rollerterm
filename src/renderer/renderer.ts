@@ -6,6 +6,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { MenuCommand, Session, RollertermApi, Settings } from "../shared/types";
 import { mountAgenda } from "./agenda";
 import { mountMail } from "./mail";
+import { mountNotes } from "./notes";
 import { mountPomodoro } from "./pomodoro";
 import { mountProd } from "./prod";
 import { mountSettings } from "./settings";
@@ -46,6 +47,8 @@ const pomodoro = mountPomodoro(
 mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 mountMail(document.getElementById("mail") as HTMLElement, api);
 mountTickets(document.getElementById("tickets") as HTMLElement, api);
+const notesPanel = mountNotes(api, () => active?.term.focus());
+document.getElementById("toggle-notes")!.addEventListener("click", () => notesPanel.toggle());
 const settingsPanel = mountSettings(api, {
   onClose: () => active?.term.focus(),
   onChange: (s) => (settings = s),
@@ -250,6 +253,9 @@ api.onExit((id, code) => {
 api.onMenu((cmd: MenuCommand) => {
   const idx = active ? tabs.indexOf(active) : -1;
   if (cmd === "new-tab") createTab();
+  // Con las notas abiertas, ⌘W las cierra en vez de cerrar la pestaña de la terminal.
+  else if (cmd === "close-tab" && notesPanel.isOpen) notesPanel.close();
+  else if (cmd === "toggle-notes") notesPanel.toggle();
   else if (cmd === "close-tab" && active) closeTab(active);
   else if (cmd === "rename-tab" && active) startRename(active);
   else if (cmd === "next-tab" && tabs.length) activate(tabs[(idx + 1) % tabs.length]);

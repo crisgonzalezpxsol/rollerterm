@@ -4,6 +4,7 @@ import type { MenuCommand, Session } from "../shared/types";
 import { CalendarSync } from "./calendar";
 import { ClaudeRunner } from "./claude-runner";
 import { MailSync } from "./mail";
+import { NotesStore } from "./notes";
 import { listMcpServers } from "./mcp-client";
 import { RailwayMonitor } from "./railway";
 import { TicketsMonitor } from "./tickets";
@@ -21,6 +22,7 @@ const ptys = new PtyManager(
 );
 
 const settings = new SettingsStore();
+const notes = new NotesStore();
 const prod = new RailwayMonitor(
   () => settings.current.railway,
   (state) => win?.webContents.send("prod:state", state),
@@ -45,6 +47,9 @@ ipcMain.handle("settings:set", async (_e, patch) => {
   if (patch.tickets) void tickets.check();
   return next;
 });
+ipcMain.handle("notes:list", () => notes.list());
+ipcMain.handle("notes:save", (_e, note) => notes.save(note));
+ipcMain.handle("notes:delete", (_e, id: string) => notes.delete(id));
 ipcMain.handle("tickets:get", () => tickets.current);
 ipcMain.on("tickets:refresh", () => void tickets.check());
 ipcMain.handle("tickets:servers", async () => (await listMcpServers()).map((s) => s.name));
@@ -129,6 +134,10 @@ function buildMenu() {
         { label: "Iniciar / pausar", accelerator: "CmdOrCtrl+Shift+P", click: () => send("pomodoro-toggle") },
         { label: "Reiniciar", click: () => send("pomodoro-reset") },
       ],
+    },
+    {
+      label: "Notas",
+      submenu: [{ label: "Mostrar / ocultar notas", accelerator: "CmdOrCtrl+Shift+N", click: () => send("toggle-notes") }],
     },
     { role: "editMenu" },
     {

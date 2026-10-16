@@ -319,7 +319,7 @@ pre.detail[hidden] { display: none; }
 .mt-actions button:hover { background: #ffffff1a; }
 
 /* ---------- configuración ---------- */
-#open-settings {
+#open-settings, #toggle-notes {
   -webkit-app-region: no-drag;
   width: 26px;
   height: 24px;
@@ -330,7 +330,7 @@ pre.detail[hidden] { display: none; }
   color: var(--text-muted);
   font-size: 15px;
 }
-#open-settings:hover { background: #ffffff1a; color: var(--text); }
+#open-settings:hover, #toggle-notes:hover, #toggle-notes.on { background: #ffffff1a; color: var(--text); }
 
 #settings {
   width: min(460px, calc(100vw - 32px));
@@ -505,3 +505,61 @@ pre.detail[hidden] { display: none; }
 .chip.pr-low { background: transparent; color: var(--text-muted); }
 #settings .tk-server-row[hidden] { display: none; }
 #tickets .panel-head > .panel-status { flex-shrink: 0; }
+
+/* ---------- notas (panel lateral) ---------- */
+#notes {
+  position: fixed;
+  top: 38px;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: min(420px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bar);
+  border-left: 1px solid #000;
+  box-shadow: -12px 0 40px #0008;
+  transform: translateX(105%);
+  transition: transform 0.18s ease;
+  visibility: hidden;
+}
+#notes.open { transform: none; visibility: visible; }
+.notes-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.notes-view[hidden] { display: none; }
+#notes header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #0006; flex-shrink: 0; }
+#notes h2 { margin: 0; font-size: 14px; font-weight: 600; }
+#notes header button {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+}
+#notes header button:hover { background: #ffffff1a; color: var(--text); }
+.notes-new { margin-left: auto; color: var(--accent) !important; font-weight: 600 !important; }
+.notes-close { font-size: 18px !important; line-height: 1; }
+.notes-saved { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+.notes-delete:hover { color: #e0675a !important; }
+.notes-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.notes-list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 10px; border-radius: 6px; }
+.notes-list li:hover { background: #ffffff0d; }
+.notes-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; }
+.notes-when { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.notes-list p { grid-column: 1 / -1; margin: 0; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notes-list p:empty { display: none; }
+.notes-list .notes-empty { display: block; color: var(--text-muted); padding: 16px 10px; }
+.notes-text {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 14px 16px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.55 -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.notes-text::placeholder { color: #666; }

@@ -11,7 +11,8 @@ App de escritorio (macOS) con dos mitades:
 - **Abajo, la terminal:** pestañas con nombre, una por ticket o por funcionalidad. Las pestañas,
   sus nombres y el directorio donde quedó cada una se recuerdan al cerrar y se restauran al abrir.
 
-Y en la barra de arriba: un indicador de **producción en Railway** y un pomodoro.
+Y en la barra de arriba: un indicador de **producción en Railway**, un pomodoro y un panel
+lateral de **notas**.
 
 ## Instalación desde cero
 
@@ -89,6 +90,7 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 | Resumir lo de las importantes ahora | botón **Resumir** (últimas 24 h) |
 | Abrir un ticket | clic en la fila (se abre en Pxsol Agencias) |
 | Ver qué servicios de producción no están OK | clic en **Prod N/M** arriba a la derecha (clic en un servicio lo abre en Railway) |
+| Notas (abrir / cerrar el panel lateral) | 📝 arriba a la derecha · `⌘⇧N` · `Esc` o `⌘W` lo cierran |
 | Configuración | ⚙ arriba a la derecha · `⌘,` |
 | Pomodoro: iniciar / pausar | clic en 🍅 (arriba a la derecha) · `⌘⇧P` |
 | Pomodoro: reiniciar | `↺` junto al reloj · menú Pomodoro → Reiniciar |
@@ -164,6 +166,14 @@ qué proyectos vigilar o se apaga el indicador.
 Usa el CLI de Railway con tu sesión (`railway list` y `railway api`, solo lectura). No pasa por
 Claude: no gasta uso del plan.
 
+### Notas
+
+Un panel lateral que se desliza desde la derecha, encima de todo, y no ocupa lugar en la
+pantalla principal. Lista de notas (la más reciente arriba) y un editor de texto libre: la
+primera línea es el título y se guarda sola mientras escribís. **Borrar** pide confirmación;
+una nota que quedó vacía se descarta sola. Con el panel abierto, `⌘W` lo cierra en vez de cerrar
+la pestaña de la terminal. Se guardan en `~/Library/Application Support/rollerterm/notes.json`.
+
 ### Configuración
 
 Con ⚙ o `⌘,`. Los cambios se guardan al instante en
@@ -217,9 +227,10 @@ Electron + [xterm.js](https://xtermjs.org) + [node-pty](https://github.com/micro
 src/main/       proceso principal: ventana, menú/atajos, una shell (pty) por pestaña, sesión,
                 agenda y correo vía Claude Code (claude-runner.ts, calendar.ts, mail.ts),
                 producción vía Railway CLI (railway.ts), tickets vía su MCP (tickets.ts,
-                mcp-client.ts), configuración (settings.ts)
+                mcp-client.ts), notas (notes.ts), configuración (settings.ts)
 src/preload/    puente aislado: expone window.rollerterm a la ventana (sin Node en el renderer)
-src/renderer/   la ventana: agenda, correo, pomodoro, barra de pestañas y una terminal xterm por pestaña
+src/renderer/   la ventana: agenda, correo, tickets, notas, pomodoro, barra de pestañas y una terminal
+                xterm por pestaña
 src/shared/     tipos compartidos (Session, CalendarState, MailState, MenuCommand, RollertermApi)
 assets/         logo.svg (fuente) e icon.png (ícono del Dock)
 ```
