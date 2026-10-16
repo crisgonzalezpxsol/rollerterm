@@ -56,7 +56,7 @@ funciona igual.
 ### 4. Instalar y abrir la app
 
 ```bash
-git clone <url-del-repo> rollerterm   # o descomprimí el .zip que te pasaron
+git clone https://github.com/crisgonzalezpxsol/rollerterm.git
 cd rollerterm
 npm install    # instala dependencias y compila la parte nativa de la terminal
 npm start      # compila y abre la app
