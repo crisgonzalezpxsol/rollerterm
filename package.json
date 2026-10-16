@@ -10,12 +10,15 @@
     "start": "node build.mjs && electron .",
     "dev": "node build.mjs && electron .",
     "typecheck": "tsc --noEmit",
-    "icon": "npx electron scripts/render-icon.cjs"
+    "icon": "npx electron scripts/render-icon.cjs",
+    "dist": "node build.mjs && electron-builder --mac dir && codesign --force --deep --sign - out/mac-*/rollerterm.app",
+    "install-app": "npm run dist && rm -rf /Applications/rollerterm.app && ditto out/mac-*/rollerterm.app /Applications/rollerterm.app"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.1",
     "@types/node": "^24.19.2",
     "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   },
@@ -24,5 +27,28 @@
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0",
     "node-pty": "^1.1.0"
+  },
+  "build": {
+    "appId": "com.pxsol.rollerterm",
+    "productName": "rollerterm",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": false,
+    "npmRebuild": true,
+    "mac": {
+      "target": "dir",
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "rollerterm abre enlaces y apps.",
+        "NSMicrophoneUsageDescription": "Las apps que corrés en la terminal pueden pedir el micrófono."
+      }
+    }
   }
 }

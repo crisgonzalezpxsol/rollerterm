@@ -72,6 +72,17 @@ Notificaciones → rollerterm.
 
 A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado**.
 
+### 5. (Opcional) Instalarla como app
+
+```bash
+npm run install-app   # arma rollerterm.app y la copia a /Applications
+```
+
+Desde ahí se abre como cualquier app (Spotlight, Launchpad, Dock). Después de cambiar el código,
+volvé a correr `npm run install-app`. Si solo querés el `.app` sin instalarlo: `npm run dist`
+(queda en `out/mac-arm64/`). Usa la misma carpeta de datos que `npm start`, así que pestañas,
+notas y configuración se comparten.
+
 ## Uso
 
 | Acción | Cómo |
