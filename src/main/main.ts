@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, Menu, shell, type MenuItemConstructorOptio
 import { join } from "node:path";
 import type { MenuCommand, Session } from "../shared/types";
 import { CalendarSync } from "./calendar";
+import { ClaudeRunner } from "./claude-runner";
+import { MailSync } from "./mail";
 import { PtyManager } from "./pty-manager";
 import { loadSession, saveSession } from "./session-store";
 
@@ -14,10 +16,20 @@ const ptys = new PtyManager(
   (id, code) => win?.webContents.send("pty:exit", id, code),
 );
 
-const calendar = new CalendarSync((state) => win?.webContents.send("calendar:state", state));
+const claude = new ClaudeRunner();
+const calendar = new CalendarSync(claude, (state) => win?.webContents.send("calendar:state", state));
+const mail = new MailSync(
+  claude,
+  (state) => win?.webContents.send("mail:state", state),
+  (threads) => win?.webContents.send("mail:new", threads),
+);
 
 ipcMain.handle("calendar:get", () => calendar.current);
 ipcMain.on("calendar:refresh", () => void calendar.sync());
+ipcMain.handle("mail:get", () => mail.current);
+ipcMain.on("mail:refresh", () => void mail.sync());
+ipcMain.on("mail:summarize", () => void mail.summarize(true));
+ipcMain.on("mail:lists", (_e, vip: string[], blocked: string[]) => void mail.setLists(vip, blocked));
 ipcMain.handle("pty:create", (_e, id: string, cwd: string, cols: number, rows: number) => ptys.create(id, cwd, cols, rows));
 ipcMain.on("pty:write", (_e, id: string, data: string) => ptys.write(id, data));
 ipcMain.on("pty:resize", (_e, id: string, cols: number, rows: number) => ptys.resize(id, cols, rows));
@@ -133,6 +145,7 @@ app.whenReady().then(() => {
   buildMenu();
   createWindow();
   calendar.start();
+  void mail.start();
   app.on("activate", () => {
     if (!win) createWindow();
   });

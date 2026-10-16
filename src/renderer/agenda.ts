@@ -1,75 +1,41 @@
 // Panel de agenda: muestra las próximas 24 h y avisa antes de cada llamada.
 // Los datos vienen del proceso main (CalendarSync); acá solo se pinta y se alerta.
-import type { CalendarEvent, CalendarState, CalendarStatus, RollertermApi } from "../shared/types";
+import type { CalendarEvent, CalendarState, RollertermApi } from "../shared/types";
+import { connectionWatcher, fmtTime, renderAlert, statusText } from "./connector";
 import { notify } from "./notify";
 
+const LABEL = "Google Calendar";
 const MINUTE = 60_000;
 /** Avisos por llamada: minutos antes del inicio (0 = al empezar). */
 const ALERT_OFFSETS_MIN = [5, 0];
-/** Mientras el calendario siga caído, se vuelve a avisar cada tanto. */
-const DOWN_REMINDER_MS = 60 * MINUTE;
 
-const STATUS_TEXT: Record<CalendarStatus, string> = {
-  loading: "Conectando…",
-  connected: "Conectado",
-  disconnected: "Google Calendar desconectado",
-  "not-configured": "Google Calendar no configurado",
-  "no-claude": "Claude Code no encontrado",
-  error: "Error al leer el calendario",
-};
-
-const FIX_TEXT: Partial<Record<CalendarStatus, string>> = {
-  disconnected: "Abrí una pestaña, corré claude, escribí /mcp y volvé a autenticar «claude.ai Google Calendar».",
-  "not-configured": "Conectá Google Calendar en claude.ai → Configuración → Conectores y después tocá ↻.",
-  "no-claude": "Instalá Claude Code y logueate (ver README → Instalación desde cero).",
-  error: "Revisá que claude funcione en una pestaña (por ejemplo, que la sesión no haya expirado) y tocá ↻.",
-};
-
-const isDown = (s: CalendarStatus) => s !== "loading" && s !== "connected";
 const isCall = (e: CalendarEvent) => e.meetUrl !== null && !e.declined;
 
 export function mountAgenda(root: HTMLElement, api: RollertermApi): void {
+  root.classList.add("panel");
   root.innerHTML = `
-    <div class="agenda-head">
+    <div class="panel-head">
       <h2>Agenda · próximas 24 h</h2>
-      <span class="agenda-status"></span>
-      <button class="agenda-refresh" title="Actualizar ahora">↻</button>
+      <span class="panel-status"></span>
+      <button class="panel-refresh" title="Actualizar ahora">↻</button>
     </div>
-    <div class="agenda-alert" hidden></div>
-    <ol class="agenda-list"></ol>`;
-  const statusEl = root.querySelector(".agenda-status") as HTMLSpanElement;
-  const refreshBtn = root.querySelector(".agenda-refresh") as HTMLButtonElement;
-  const alertEl = root.querySelector(".agenda-alert") as HTMLDivElement;
-  const listEl = root.querySelector(".agenda-list") as HTMLOListElement;
+    <div class="panel-alert" hidden></div>
+    <ol class="panel-list"></ol>`;
+  const statusEl = root.querySelector(".panel-status") as HTMLSpanElement;
+  const refreshBtn = root.querySelector(".panel-refresh") as HTMLButtonElement;
+  const alertEl = root.querySelector(".panel-alert") as HTMLDivElement;
+  const listEl = root.querySelector(".panel-list") as HTMLOListElement;
 
   let state: CalendarState | null = null;
   const alerted = new Set<string>();
-  let lastDownAlert = 0;
-  let prevStatus: CalendarStatus = "loading";
+  const watchConnection = connectionWatcher(LABEL, "Los avisos de llamadas pueden fallar.");
 
   refreshBtn.addEventListener("click", () => api.refreshCalendar());
 
   function onState(next: CalendarState) {
     state = next;
-    checkConnection(next);
+    if (!next.syncing) watchConnection(next.status);
     render();
-  }
-
-  // ---------- avisos de desconexión ----------
-
-  function checkConnection(s: CalendarState) {
-    if (s.syncing) return;
-    const now = Date.now();
-    if (isDown(s.status)) {
-      const changed = s.status !== prevStatus;
-      if (changed || now - lastDownAlert >= DOWN_REMINDER_MS) {
-        lastDownAlert = now;
-        notify(`rollerterm · ${STATUS_TEXT[s.status]}`, "Los avisos de llamadas pueden fallar. " + (FIX_TEXT[s.status] ?? ""));
-      }
-    } else if (s.status === "connected" && isDown(prevStatus)) {
-      notify("rollerterm · Google Calendar", "Conectado de nuevo: los avisos de llamadas siguen activos.");
-    }
-    prevStatus = s.status;
   }
 
   // ---------- avisos de llamadas ----------
@@ -99,26 +65,18 @@ export function mountAgenda(root: HTMLElement, api: RollertermApi): void {
     const { status, syncing, lastSync, message } = state;
     statusEl.dataset.status = status;
     const synced = lastSync ? ` · ${fmtTime(lastSync)}` : "";
-    statusEl.textContent = syncing && status === "loading" ? STATUS_TEXT.loading : `${STATUS_TEXT[status]}${synced}`;
+    statusEl.textContent = `${statusText(LABEL, status)}${synced}`;
     refreshBtn.disabled = syncing;
     refreshBtn.classList.toggle("spinning", syncing);
 
-    alertEl.hidden = !isDown(status);
-    if (isDown(status)) {
-      alertEl.innerHTML = "";
-      const title = document.createElement("strong");
-      title.textContent = STATUS_TEXT[status];
-      const detail = document.createElement("p");
-      detail.textContent = [message, FIX_TEXT[status]].filter(Boolean).join(" ");
-      alertEl.append(title, detail);
-    }
+    renderAlert(alertEl, LABEL, status, message);
 
     const now = Date.now();
     const upcoming = state.events.filter((e) => Date.parse(e.end) > now);
     listEl.innerHTML = "";
     if (upcoming.length === 0) {
       const empty = document.createElement("li");
-      empty.className = "agenda-empty";
+      empty.className = "panel-empty";
       empty.textContent = status === "loading" ? "Leyendo tu calendario…" : "Sin eventos en las próximas 24 horas.";
       listEl.append(empty);
       return;
@@ -165,10 +123,6 @@ export function mountAgenda(root: HTMLElement, api: RollertermApi): void {
     checkCalls();
     render();
   }, 15_000);
-}
-
-function fmtTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
 function relative(start: number, end: number, now: number): string {
