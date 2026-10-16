@@ -61,6 +61,13 @@ function buildMenu() {
         ...gotoItems,
       ],
     },
+    {
+      label: "Pomodoro",
+      submenu: [
+        { label: "Iniciar / pausar", accelerator: "CmdOrCtrl+Shift+P", click: () => send("pomodoro-toggle") },
+        { label: "Reiniciar", click: () => send("pomodoro-reset") },
+      ],
+    },
     { role: "editMenu" },
     {
       label: "Ver",

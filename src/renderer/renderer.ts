@@ -4,6 +4,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { MenuCommand, Session, RollertermApi } from "../shared/types";
+import { mountPomodoro } from "./pomodoro";
 
 declare global {
   interface Window {
@@ -29,6 +30,7 @@ interface Tab {
 const tabsEl = document.getElementById("tabs") as HTMLDivElement;
 const panesEl = document.getElementById("panes") as HTMLDivElement;
 const newTabBtn = document.getElementById("new-tab") as HTMLButtonElement;
+const pomodoro = mountPomodoro(document.getElementById("pomodoro") as HTMLDivElement);
 
 let tabs: Tab[] = [];
 let active: Tab | null = null;
@@ -230,6 +232,8 @@ api.onMenu((cmd: MenuCommand) => {
   else if (cmd === "close-tab" && active) closeTab(active);
   else if (cmd === "rename-tab" && active) startRename(active);
   else if (cmd === "next-tab" && tabs.length) activate(tabs[(idx + 1) % tabs.length]);
+  else if (cmd === "pomodoro-toggle") pomodoro.toggle();
+  else if (cmd === "pomodoro-reset") pomodoro.reset();
   else if (cmd === "prev-tab" && tabs.length) activate(tabs[(idx - 1 + tabs.length) % tabs.length]);
   else if (cmd.startsWith("goto-tab:")) {
     const n = Number(cmd.split(":")[1]);

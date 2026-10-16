@@ -19,6 +19,11 @@ npm start       # compila y abre la app
 | Cambiar de pestaña | `⌘1`…`⌘8`, `⌘9` = la última · `⌘⇧]` / `⌘⇧[` |
 | Reordenar | arrastrar la pestaña |
 | Reabrir una shell que terminó | Enter dentro de la pestaña (conserva el nombre) |
+| Pomodoro: iniciar / pausar | clic en 🍅 (a la derecha de la barra) · `⌘⇧P` |
+| Pomodoro: reiniciar | `↺` junto al reloj · menú Pomodoro → Reiniciar |
+
+El pomodoro hace 25 min de foco → 5 min de descanso → 1 min de gracia para acomodarse → foco
+otra vez, en ciclo, con una notificación del sistema en cada cambio de fase.
 
 La sesión se guarda en `~/Library/Application Support/rollerterm/session.json`.
 

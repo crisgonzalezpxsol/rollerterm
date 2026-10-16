@@ -104,6 +104,36 @@ body { display: flex; flex-direction: column; }
 }
 #new-tab:hover { background: #ffffff1a; color: var(--text); }
 
+/* Pomodoro: a la derecha de la barra; el color indica la fase. */
+#pomodoro {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 4px auto;
+  padding-left: 12px;
+  flex-shrink: 0;
+  --pomo: var(--text-muted);
+}
+#pomodoro[data-phase="focus"] { --pomo: #e0675a; }
+#pomodoro[data-phase="break"] { --pomo: #5ab37a; }
+#pomodoro[data-phase="grace"] { --pomo: #d9a441; }
+#pomodoro.paused { opacity: 0.6; }
+
+#pomodoro button {
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--pomo);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+#pomodoro button:hover { background: #ffffff1a; }
+.pomo-display { padding: 0 8px; }
+.pomo-reset { width: 24px; font-size: 14px; }
+.pomo-reset[hidden] { display: none; }
+
 #panes { position: relative; flex: 1; min-height: 0; }
 .pane { position: absolute; inset: 0; padding: 6px 0 0 8px; display: none; }
 .pane.active { display: block; }

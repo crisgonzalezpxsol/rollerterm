@@ -18,6 +18,8 @@ export type MenuCommand =
   | "rename-tab"
   | "next-tab"
   | "prev-tab"
+  | "pomodoro-toggle"
+  | "pomodoro-reset"
   | `goto-tab:${number}`;
 
 /** API que el preload expone a la ventana como `window.rollerterm`. */
