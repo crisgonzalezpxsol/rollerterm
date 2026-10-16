@@ -20,6 +20,7 @@ export type MenuCommand =
   | "prev-tab"
   | "pomodoro-toggle"
   | "pomodoro-reset"
+  | "open-settings"
   | `goto-tab:${number}`;
 
 /** API que el preload expone a la ventana como `window.rollerterm`. */
@@ -44,6 +45,11 @@ export interface RollertermApi {
   onMail(cb: (state: MailState) => void): void;
   /** Hilos que llegaron desde la última sincronización (para notificar). */
   onNewMail(cb: (threads: MailThread[]) => void): void;
+  getSettings(): Promise<Settings>;
+  setSettings(patch: Partial<Settings>): Promise<Settings>;
+  listBrowsers(): Promise<BrowserInfo[]>;
+  /** Abre una página de prueba con el navegador configurado. */
+  testBrowser(): void;
 }
 
 /** Un evento de Google Calendar tal como lo devuelve Claude Code. */
@@ -125,4 +131,23 @@ export interface MailState {
   blocked: string[];
   summary: MailSummary | null;
   summaryError: string | null;
+}
+
+/** Con qué navegador se abren los links (Unirme, correos, links de la terminal). */
+export interface BrowserChoice {
+  /** Ruta del .app; null = el navegador predeterminado del sistema. */
+  appPath: string | null;
+  /** Carpeta del perfil en navegadores basados en Chromium ("Default", "Profile 1"); null = el último usado. */
+  profile: string | null;
+}
+
+export interface Settings {
+  browser: BrowserChoice;
+}
+
+export interface BrowserInfo {
+  name: string;
+  appPath: string;
+  /** Solo para navegadores con perfiles detectables (Chrome, Brave, Edge…). */
+  profiles: { dir: string; label: string }[];
 }

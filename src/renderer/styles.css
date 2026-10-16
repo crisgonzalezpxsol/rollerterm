@@ -307,3 +307,66 @@ pre.detail[hidden] { display: none; }
 .mail-thread:hover .mt-actions { display: flex; }
 .mt-actions button { width: 22px; height: 20px; border: 0; border-radius: 3px; background: transparent; color: #d9a441; font-size: 12px; }
 .mt-actions button:hover { background: #ffffff1a; }
+
+/* ---------- configuración ---------- */
+#open-settings {
+  -webkit-app-region: no-drag;
+  width: 26px;
+  height: 24px;
+  margin-left: 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+}
+#open-settings:hover { background: #ffffff1a; color: var(--text); }
+
+#settings {
+  width: min(460px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid #ffffff26;
+  border-radius: 10px;
+  background: var(--bar);
+  color: var(--text);
+  box-shadow: 0 20px 60px #0009;
+}
+#settings::backdrop { background: #0008; }
+#settings header { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #0006; }
+#settings h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.settings-close {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.settings-close:hover { background: #ffffff1a; color: var(--text); }
+#settings section { padding: 14px 16px 16px; }
+#settings h3 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.settings-help { margin: 4px 0 12px; color: var(--text-muted); }
+#settings label { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+#settings label[hidden] { display: none; }
+#settings select {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  font: inherit;
+  color: var(--text);
+  background: #111;
+  border: 1px solid #ffffff26;
+  border-radius: 4px;
+  padding: 0 6px;
+}
+#settings select:focus { outline: none; border-color: var(--accent); }
+#settings label { justify-content: space-between; }
+#settings label > select { max-width: 320px; }
+.settings-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.browser-test { height: 24px; padding: 0 12px; border: 0; border-radius: 4px; background: var(--accent); color: #fff; font: inherit; }
+.browser-test:hover { filter: brightness(1.15); }
+.settings-saved { color: #5ab37a; }
+.settings-saved[hidden] { display: none; }

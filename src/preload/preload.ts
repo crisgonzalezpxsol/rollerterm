@@ -20,6 +20,10 @@ const api: RollertermApi = {
   summarizeMail: () => ipcRenderer.send("mail:summarize"),
   setMailLists: (vip, blocked) => ipcRenderer.send("mail:lists", vip, blocked),
   onMail: (cb) => ipcRenderer.on("mail:state", (_e, state: MailState) => cb(state)),
+  getSettings: () => ipcRenderer.invoke("settings:get"),
+  setSettings: (patch) => ipcRenderer.invoke("settings:set", patch),
+  listBrowsers: () => ipcRenderer.invoke("settings:browsers"),
+  testBrowser: () => ipcRenderer.send("settings:test-browser"),
   onNewMail: (cb) => ipcRenderer.on("mail:new", (_e, threads: MailThread[]) => cb(threads)),
 };
 

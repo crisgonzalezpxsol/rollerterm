@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, type MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
 import type { MenuCommand, Session } from "../shared/types";
 import { CalendarSync } from "./calendar";
 import { ClaudeRunner } from "./claude-runner";
 import { MailSync } from "./mail";
+import { listBrowsers, SettingsStore } from "./settings";
 import { PtyManager } from "./pty-manager";
 import { loadSession, saveSession } from "./session-store";
 
@@ -16,6 +17,7 @@ const ptys = new PtyManager(
   (id, code) => win?.webContents.send("pty:exit", id, code),
 );
 
+const settings = new SettingsStore();
 const claude = new ClaudeRunner();
 const calendar = new CalendarSync(claude, (state) => win?.webContents.send("calendar:state", state));
 const mail = new MailSync(
@@ -24,6 +26,10 @@ const mail = new MailSync(
   (threads) => win?.webContents.send("mail:new", threads),
 );
 
+ipcMain.handle("settings:get", () => settings.current);
+ipcMain.handle("settings:set", (_e, patch) => settings.update(patch));
+ipcMain.handle("settings:browsers", () => listBrowsers());
+ipcMain.on("settings:test-browser", () => settings.openUrl("https://calendar.google.com"));
 ipcMain.handle("calendar:get", () => calendar.current);
 ipcMain.on("calendar:refresh", () => void calendar.sync());
 ipcMain.handle("mail:get", () => mail.current);
@@ -64,7 +70,22 @@ function buildMenu() {
   }));
 
   const template: MenuItemConstructorOptions[] = [
-    { role: "appMenu" },
+    {
+      role: "appMenu",
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { label: "Configuración…", accelerator: "CmdOrCtrl+,", click: () => send("open-settings") },
+        { type: "separator" },
+        { role: "services" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
     {
       label: "Pestañas",
       submenu: [
@@ -118,9 +139,9 @@ function createWindow() {
     },
   });
   win.loadFile(join(__dirname, "index.html"));
-  // Los enlaces que se clickean en la terminal se abren en el navegador, nunca en la app.
+  // Todos los links (terminal, Unirme, correos) se abren en el navegador configurado, nunca en la app.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) shell.openExternal(url);
+    settings.openUrl(url);
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (e) => e.preventDefault());
@@ -141,7 +162,8 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await settings.load();
   // Sin empaquetar, macOS mostraría el ícono genérico de Electron en el Dock.
   app.dock?.setIcon(join(__dirname, "icon.png"));
   buildMenu();

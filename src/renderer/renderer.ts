@@ -7,6 +7,7 @@ import type { MenuCommand, Session, RollertermApi } from "../shared/types";
 import { mountAgenda } from "./agenda";
 import { mountMail } from "./mail";
 import { mountPomodoro } from "./pomodoro";
+import { mountSettings } from "./settings";
 
 declare global {
   interface Window {
@@ -35,6 +36,8 @@ const newTabBtn = document.getElementById("new-tab") as HTMLButtonElement;
 const pomodoro = mountPomodoro(document.getElementById("pomodoro") as HTMLDivElement);
 mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 mountMail(document.getElementById("mail") as HTMLElement, api);
+const settingsPanel = mountSettings(api, () => active?.term.focus());
+document.getElementById("open-settings")!.addEventListener("click", () => void settingsPanel.open());
 
 let tabs: Tab[] = [];
 let active: Tab | null = null;
@@ -238,6 +241,7 @@ api.onMenu((cmd: MenuCommand) => {
   else if (cmd === "next-tab" && tabs.length) activate(tabs[(idx + 1) % tabs.length]);
   else if (cmd === "pomodoro-toggle") pomodoro.toggle();
   else if (cmd === "pomodoro-reset") pomodoro.reset();
+  else if (cmd === "open-settings") void settingsPanel.open();
   else if (cmd === "prev-tab" && tabs.length) activate(tabs[(idx - 1 + tabs.length) % tabs.length]);
   else if (cmd.startsWith("goto-tab:")) {
     const n = Number(cmd.split(":")[1]);

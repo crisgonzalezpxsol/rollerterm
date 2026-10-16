@@ -63,7 +63,7 @@ npm start      # compila y abre la app
 
 La primera vez, macOS pregunta si la app puede mandar **notificaciones**: decí que sí, porque si no
 los avisos de llamadas no aparecen. Si lo rechazaste, activalas en Configuración del Sistema →
-Notificaciones → Electron.
+Notificaciones → rollerterm.
 
 A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado**.
 
@@ -83,6 +83,7 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 | Marcar un remitente como importante / bloquearlo | pasá el mouse por el correo → `★` / `🚫` |
 | Editar direcciones importantes y bloqueadas | botón **Direcciones** (acepta direcciones o dominios enteros: `empresa.com`) |
 | Resumir lo de las importantes ahora | botón **Resumir** (últimas 24 h) |
+| Configuración | ⚙ arriba a la derecha · `⌘,` |
 | Pomodoro: iniciar / pausar | clic en 🍅 (arriba a la derecha) · `⌘⇧P` |
 | Pomodoro: reiniciar | `↺` junto al reloj · menú Pomodoro → Reiniciar |
 
@@ -119,6 +120,16 @@ prohibido explícitamente. Se usa el modelo Haiku y se bloquean los demás conec
 consulta sea liviana. Uso aproximado de tu plan: agenda ~US$0,005 cada 10 min, correo ~US$0,01
 cada 5 min, y cada resumen ~US$0,05.
 
+### Configuración
+
+Con ⚙ o `⌘,`. Los cambios se guardan al instante en
+`~/Library/Application Support/rollerterm/settings.json`.
+
+- **Navegador:** con cuál se abren «Unirme», los correos y los links de la terminal. Por defecto,
+  el del sistema. En Chrome, Brave, Edge y otros basados en Chromium también se elige el **perfil**
+  (por ejemplo, el de la cuenta del trabajo, para que Meet y Gmail abran con esa cuenta). **Probar**
+  abre Google Calendar con lo elegido.
+
 ### Pomodoro
 
 25 min de foco → 5 min de descanso → 1 min de gracia para acomodarse → foco otra vez, en ciclo,
@@ -139,7 +150,8 @@ el cartel, la app reintenta una vez sola: los conectores de claude.ai a veces tr
 | **Google Calendar / Gmail no configurado** | Falta el paso 3: conectalo en claude.ai → Configuración → Conectores y tocá `↻`. |
 | **Google Calendar / Gmail desconectado** | En una pestaña: `claude` → `/mcp` → **claude.ai Google Calendar** (o **Gmail**) **→ Authenticate**. Después `↻`. |
 | **Error al leer…** con "Not logged in" | La sesión de Claude Code expiró: corré `claude` en una pestaña, logueate y tocá `↻`. |
-| No llegan notificaciones | Configuración del Sistema → Notificaciones → Electron → permitir. Revisá también que no esté activo "No molestar". |
+| No llegan notificaciones | Configuración del Sistema → Notificaciones → rollerterm → permitir. Revisá también que no esté activo "No molestar". |
+| En la barra de menú dice "Electron" en vez de "rollerterm" | Corré `npm run postinstall` (renombra el Electron que trae npm) y reabrí la app. |
 | **`posix_spawnp failed`** al abrir una pestaña | npm instala el `spawn-helper` de node-pty sin permiso de ejecución. Corré `npm run postinstall`. |
 | La terminal falla después de actualizar Electron | Hay que recompilar node-pty: `npm run postinstall`. |
 
@@ -157,4 +169,6 @@ src/shared/     tipos compartidos (Session, CalendarState, MailState, MenuComman
 assets/         logo.svg (fuente) e icon.png (ícono del Dock)
 ```
 
-Si cambiás `assets/logo.svg`, regenerá el PNG con `npx electron scripts/render-icon.cjs`.
+Si cambiás `assets/logo.svg`, regenerá el PNG con `npm run icon` (y el `.icns` con `iconutil`).
+`scripts/brand-electron.sh` corre en el `postinstall`: le pone a la copia de Electron de
+`node_modules` el nombre, el identificador (`com.pxsol.rollerterm`) y el ícono de la app.

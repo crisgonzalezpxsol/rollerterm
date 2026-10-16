@@ -63,9 +63,12 @@ export class CalendarSync {
       });
       if (res.output) {
         // Los eventos que ya se conocían se conservan si una sincronización falla.
+        // Si esta vez el modelo no extrajo el link de un evento que ya lo tenía, se conserva el
+        // anterior: sin link, esa llamada no avisaría.
+        const knownLinks = new Map(this.state.events.map((e) => [e.id, e.meetUrl]));
         const events = res.output.events
           .filter((e) => e.start.includes("T") && !Number.isNaN(Date.parse(e.start)))
-          .map((e) => ({ ...e, title: e.title.trim() }));
+          .map((e) => ({ ...e, title: e.title.trim(), meetUrl: e.meetUrl || knownLinks.get(e.id) || null }));
         this.update({ status: res.status, message: null, detail: null, events, lastSync: Date.now() });
       } else {
         this.update({ status: res.status, message: res.message, detail: res.detail ?? null });
@@ -90,7 +93,10 @@ function buildPrompt(): string {
     `Llamá UNA sola vez a list_events con startTime="${localIso(now)}", endTime="${localIso(end)}",`,
     `orderBy="startTime", pageSize=50, eventType=["DEFAULT"]. No llames a ninguna otra herramienta.`,
     `Con el resultado devolvé los eventos con hora (ignorá los de día completo).`,
-    `start y end en ISO 8601 con offset. meetUrl = link de videollamada (Meet, Zoom o Teams) o null.`,
+    `start y end en ISO 8601 con offset.`,
+    `meetUrl: el link de videollamada. Tomalo de hangoutLink; si no está, de conferenceData.entryPoints`,
+    `(el de entryPointType "video"); si no, de un link de meet.google.com, zoom.us o teams.microsoft.com`,
+    `que aparezca en location o description. Solo null si no hay ninguno.`,
     `declined = true si mi respuesta a la invitación es "declined".`,
   ].join(" ");
 }

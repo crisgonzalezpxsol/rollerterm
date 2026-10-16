@@ -5,11 +5,12 @@
   "description": "Terminal de escritorio con pestañas con nombre, una por ticket o funcionalidad.",
   "main": "dist/main.js",
   "scripts": {
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null; electron-rebuild -f -w node-pty",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null; electron-rebuild -f -w node-pty && sh scripts/brand-electron.sh",
     "build": "node build.mjs",
     "start": "node build.mjs && electron .",
     "dev": "node build.mjs && electron .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "icon": "npx electron scripts/render-icon.cjs"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.1",
