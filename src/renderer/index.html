@@ -7,12 +7,18 @@
     <link rel="stylesheet" href="renderer.css" />
   </head>
   <body>
-    <header id="tabbar">
-      <div id="tabs"></div>
-      <button id="new-tab" title="Nueva pestaña (⌘T)">+</button>
+    <header id="titlebar">
+      <span class="app-name">rollerterm</span>
       <div id="pomodoro"></div>
     </header>
-    <main id="panes"></main>
+    <section id="agenda"></section>
+    <section id="terminals">
+      <nav id="tabbar">
+        <div id="tabs"></div>
+        <button id="new-tab" title="Nueva pestaña (⌘T)">+</button>
+      </nav>
+      <main id="panes"></main>
+    </section>
     <script src="renderer.js"></script>
   </body>
 </html>

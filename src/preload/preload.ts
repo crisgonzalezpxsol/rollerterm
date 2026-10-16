@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { MenuCommand, Session, RollertermApi } from "../shared/types";
+import type { CalendarState, MenuCommand, Session, RollertermApi } from "../shared/types";
 
 const api: RollertermApi = {
   createPty: (id, cwd, cols, rows) => ipcRenderer.invoke("pty:create", id, cwd, cols, rows),
@@ -12,6 +12,9 @@ const api: RollertermApi = {
   onData: (cb) => ipcRenderer.on("pty:data", (_e, id: string, data: string) => cb(id, data)),
   onExit: (cb) => ipcRenderer.on("pty:exit", (_e, id: string, code: number) => cb(id, code)),
   onMenu: (cb) => ipcRenderer.on("menu", (_e, cmd: MenuCommand) => cb(cmd)),
+  getCalendar: () => ipcRenderer.invoke("calendar:get"),
+  refreshCalendar: () => ipcRenderer.send("calendar:refresh"),
+  onCalendar: (cb) => ipcRenderer.on("calendar:state", (_e, state: CalendarState) => cb(state)),
 };
 
 contextBridge.exposeInMainWorld("rollerterm", api);

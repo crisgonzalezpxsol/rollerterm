@@ -4,6 +4,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { MenuCommand, Session, RollertermApi } from "../shared/types";
+import { mountAgenda } from "./agenda";
 import { mountPomodoro } from "./pomodoro";
 
 declare global {
@@ -31,6 +32,7 @@ const tabsEl = document.getElementById("tabs") as HTMLDivElement;
 const panesEl = document.getElementById("panes") as HTMLDivElement;
 const newTabBtn = document.getElementById("new-tab") as HTMLButtonElement;
 const pomodoro = mountPomodoro(document.getElementById("pomodoro") as HTMLDivElement);
+mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 
 let tabs: Tab[] = [];
 let active: Tab | null = null;

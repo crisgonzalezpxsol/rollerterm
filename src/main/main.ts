@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
 import type { MenuCommand, Session } from "../shared/types";
+import { CalendarSync } from "./calendar";
 import { PtyManager } from "./pty-manager";
 import { loadSession, saveSession } from "./session-store";
 
@@ -13,6 +14,10 @@ const ptys = new PtyManager(
   (id, code) => win?.webContents.send("pty:exit", id, code),
 );
 
+const calendar = new CalendarSync((state) => win?.webContents.send("calendar:state", state));
+
+ipcMain.handle("calendar:get", () => calendar.current);
+ipcMain.on("calendar:refresh", () => void calendar.sync());
 ipcMain.handle("pty:create", (_e, id: string, cwd: string, cols: number, rows: number) => ptys.create(id, cwd, cols, rows));
 ipcMain.on("pty:write", (_e, id: string, data: string) => ptys.write(id, data));
 ipcMain.on("pty:resize", (_e, id: string, cols: number, rows: number) => ptys.resize(id, cols, rows));
@@ -127,6 +132,7 @@ function createWindow() {
 app.whenReady().then(() => {
   buildMenu();
   createWindow();
+  calendar.start();
   app.on("activate", () => {
     if (!win) createWindow();
   });

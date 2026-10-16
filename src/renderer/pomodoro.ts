@@ -1,5 +1,6 @@
-// Pomodoro en la barra de pestañas: foco → descanso → gracia → foco…
+// Pomodoro en la barra de título: foco → descanso → gracia → foco…
 // La gracia es un minuto para acomodarse antes de volver a trabajar.
+import { notify } from "./notify";
 
 type Phase = "focus" | "break" | "grace";
 
@@ -55,7 +56,7 @@ export function mountPomodoro(root: HTMLElement): Pomodoro {
       endsAt += PHASES[phase].ms;
       // Si la app estuvo dormida y se saltearon fases, se alinea al presente.
       if (endsAt <= Date.now()) endsAt = Date.now() + PHASES[phase].ms;
-      notify(PHASES[done].notice);
+      notify("rollerterm · Pomodoro", PHASES[done].notice);
     }
     render();
   }
@@ -92,12 +93,4 @@ export function mountPomodoro(root: HTMLElement): Pomodoro {
   resetBtn.addEventListener("click", () => api.reset());
   render();
   return api;
-}
-
-function notify(body: string) {
-  try {
-    new Notification("rollerterm · Pomodoro", { body });
-  } catch (err) {
-    console.error("[pomodoro notify]", err);
-  }
 }
