@@ -1,11 +1,15 @@
 // Ventana de configuración (⚙ en la barra de título o ⌘,). Cada cambio se guarda al instante.
-import type { BrowserInfo, RollertermApi, Settings } from "../shared/types";
+import type { BrowserInfo, PomodoroSound, RollertermApi, Settings } from "../shared/types";
+import { bell, tick } from "./sound";
 
 export interface SettingsPanel {
   open(): void;
 }
 
-export function mountSettings(api: RollertermApi, onClose: () => void): SettingsPanel {
+export function mountSettings(
+  api: RollertermApi,
+  hooks: { onClose: () => void; onChange: (settings: Settings) => void },
+): SettingsPanel {
   const dialog = document.createElement("dialog");
   dialog.id = "settings";
   dialog.innerHTML = `
@@ -22,6 +26,15 @@ export function mountSettings(api: RollertermApi, onClose: () => void): Settings
         <button class="browser-test">Probar</button>
         <span class="settings-saved" hidden>Guardado</span>
       </div>
+    </section>
+    <section>
+      <h3>Pomodoro</h3>
+      <label class="check"><input type="checkbox" class="pomo-ticking" /> Tictac de reloj mientras corre</label>
+      <label class="check"><input type="checkbox" class="pomo-bell" /> Timbre al cambiar de fase</label>
+      <label>Volumen <input type="range" class="pomo-volume" min="0" max="1" step="0.05" /></label>
+      <div class="settings-actions">
+        <button class="pomo-test">Probar sonido</button>
+      </div>
     </section>`;
   document.body.append(dialog);
 
@@ -30,6 +43,9 @@ export function mountSettings(api: RollertermApi, onClose: () => void): Settings
   const profileRow = $<HTMLLabelElement>(".profile-row");
   const profileSel = $<HTMLSelectElement>(".profile-select");
   const saved = $<HTMLSpanElement>(".settings-saved");
+  const tickingBox = $<HTMLInputElement>(".pomo-ticking");
+  const bellBox = $<HTMLInputElement>(".pomo-bell");
+  const volumeRange = $<HTMLInputElement>(".pomo-volume");
 
   let browsers: BrowserInfo[] = [];
   let settings: Settings | null = null;
@@ -57,10 +73,15 @@ export function mountSettings(api: RollertermApi, onClose: () => void): Settings
     profileRow.hidden = profiles.length === 0;
     profileSel.replaceChildren(option("", "El último que usaste"), ...profiles.map((p) => option(p.dir, p.label)));
     profileSel.value = profiles.some((p) => p.dir === profile) ? (profile as string) : "";
+
+    tickingBox.checked = settings.pomodoro.ticking;
+    bellBox.checked = settings.pomodoro.bell;
+    volumeRange.value = String(settings.pomodoro.volume);
   }
 
   async function save(patch: Partial<Settings>) {
     settings = await api.setSettings(patch);
+    hooks.onChange(settings);
     render();
     saved.hidden = false;
     clearTimeout(savedTimer);
@@ -75,8 +96,25 @@ export function mountSettings(api: RollertermApi, onClose: () => void): Settings
     void save({ browser: { appPath: settings!.browser.appPath, profile: profileSel.value || null } });
   });
   $<HTMLButtonElement>(".browser-test").addEventListener("click", () => api.testBrowser());
+
+  const pomodoro = (): PomodoroSound => ({
+    ticking: tickingBox.checked,
+    bell: bellBox.checked,
+    volume: Number(volumeRange.value),
+  });
+  tickingBox.addEventListener("change", () => void save({ pomodoro: pomodoro() }));
+  bellBox.addEventListener("change", () => void save({ pomodoro: pomodoro() }));
+  volumeRange.addEventListener("change", () => void save({ pomodoro: pomodoro() }));
+  $<HTMLButtonElement>(".pomo-test").addEventListener("click", () => {
+    // Prueba con el volumen del control, aunque el tictac o el timbre estén apagados.
+    const volume = Number(volumeRange.value);
+    tick("tic", volume);
+    setTimeout(() => tick("tac", volume), 1000);
+    setTimeout(() => bell(volume, 2), 2000);
+  });
+
   $<HTMLButtonElement>(".settings-close").addEventListener("click", () => dialog.close());
-  dialog.addEventListener("close", onClose);
+  dialog.addEventListener("close", hooks.onClose);
   // Clic en el fondo oscuro cierra.
   dialog.addEventListener("click", (e) => {
     if (e.target === dialog) dialog.close();

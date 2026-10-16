@@ -84,7 +84,7 @@ export interface CalendarState {
   syncing: boolean;
 }
 
-/** Un hilo de Gmail no leído, con los datos de su mensaje más reciente. */
+/** Un hilo de la bandeja de entrada, con los datos de su mensaje más reciente. */
 export interface MailThread {
   threadId: string;
   fromEmail: string;
@@ -95,6 +95,8 @@ export interface MailThread {
   date: string;
   /** Link para abrir el hilo en Gmail. */
   viewUrl: string;
+  /** true si tiene algún mensaje sin leer. */
+  unread: boolean;
 }
 
 export interface MailSummaryItem {
@@ -141,8 +143,18 @@ export interface BrowserChoice {
   profile: string | null;
 }
 
+export interface PomodoroSound {
+  /** Tictac de reloj mientras corre. */
+  ticking: boolean;
+  /** Timbre al cambiar de fase. */
+  bell: boolean;
+  /** 0 a 1. */
+  volume: number;
+}
+
 export interface Settings {
   browser: BrowserChoice;
+  pomodoro: PomodoroSound;
 }
 
 export interface BrowserInfo {

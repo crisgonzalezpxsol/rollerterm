@@ -1,4 +1,4 @@
-// Correo: no leídos del inbox (avisa los nuevos), direcciones importantes y bloqueadas,
+// Correo: bandeja de entrada de las últimas 48 h (avisa los nuevos sin leer), direcciones importantes y bloqueadas,
 // y resúmenes periódicos de lo que mandaron las importantes. Todo vía Claude Code.
 import { app, powerMonitor } from "electron";
 import { readFile, rename, writeFile } from "node:fs/promises";
@@ -6,7 +6,13 @@ import { join } from "node:path";
 import type { MailState, MailSummary, MailThread } from "../shared/types";
 import type { ClaudeRunner } from "./claude-runner";
 
-const SYNC_EVERY_MS = 5 * 60_000;
+// Frecuencia: cada 5 min mientras usás la Mac; si está inactiva hace 10 min o más, cada 15
+// (no tiene sentido gastar uso del plan si nadie mira). Al volver a la ventana se revisa ya
+// si pasaron más de 2 min.
+const SYNC_ACTIVE_MS = 5 * 60_000;
+const SYNC_IDLE_MS = 15 * 60_000;
+const IDLE_AFTER_S = 10 * 60;
+const STALE_ON_FOCUS_MS = 2 * 60_000;
 const SUMMARY_EVERY_MS = 3 * 3_600_000;
 const SERVER = "claude.ai Gmail";
 const TOOL = "mcp__claude_ai_Gmail__";
@@ -30,6 +36,7 @@ const THREAD_PROPS = {
   snippet: { type: "string" },
   date: { type: "string", description: "ISO 8601 con offset" },
   viewUrl: { type: "string" },
+  unread: { type: "boolean" },
 };
 const THREADS_SCHEMA = {
   type: "object",
@@ -115,8 +122,16 @@ export class MailSync {
     }
     this.update({ vip: this.store.vip, blocked: this.store.blocked, summary: this.store.summary });
     void this.sync().then(() => this.maybeSummarize());
-    setInterval(() => void this.sync().then(() => this.maybeSummarize()), SYNC_EVERY_MS);
+    setInterval(() => {
+      const every = powerMonitor.getSystemIdleTime() >= IDLE_AFTER_S ? SYNC_IDLE_MS : SYNC_ACTIVE_MS;
+      if (Date.now() - this.lastAttempt >= every) void this.sync().then(() => this.maybeSummarize());
+    }, 30_000);
     powerMonitor.on("resume", () => void this.sync());
+  }
+
+  /** Al volver a la ventana: revisar si lo último es de hace un rato. */
+  syncIfStale(): void {
+    if (Date.now() - this.lastAttempt >= STALE_ON_FOCUS_MS) void this.sync();
   }
 
   async setLists(vip: string[], blocked: string[]): Promise<void> {
@@ -129,21 +144,27 @@ export class MailSync {
     await this.save();
   }
 
+  /** Cuándo arrancó la última sincronización (haya salido bien o no). */
+  private lastAttempt = 0;
+
   async sync(): Promise<void> {
     if (this.state.syncing) return;
+    this.lastAttempt = Date.now();
     this.update({ syncing: true });
     try {
-      const query = ["in:inbox", "is:unread", "newer_than:2d", ...this.store.blocked.map((b) => `-from:${b}`)].join(" ");
+      // Todo el inbox (leído o no); la búsqueda de Gmail ya deja afuera spam y papelera.
+      const query = ["in:inbox", "newer_than:2d", ...this.store.blocked.map((b) => `-from:${b}`)].join(" ");
       const res = await this.claude.query<{ threads: MailThread[] }>({
         server: SERVER,
         allow: [SEARCH],
         deny: WRITE_TOOLS,
         schema: THREADS_SCHEMA,
         prompt: [
-          `Llamá UNA sola vez a search_threads con query=${JSON.stringify(query)}, pageSize=30, view="THREAD_VIEW_MINIMAL".`,
+          `Llamá UNA sola vez a search_threads con query=${JSON.stringify(query)}, pageSize=40, view="THREAD_VIEW_MINIMAL".`,
           `No llames a ninguna otra herramienta. Por cada hilo devolvé los datos de su mensaje más reciente.`,
           `fromEmail: solo la dirección, en minúsculas. fromName: el nombre si viene, si no la dirección.`,
           `snippet: como mucho 140 caracteres. date en ISO 8601 con offset. viewUrl tal cual viene.`,
+          `unread: true si algún mensaje del hilo tiene la etiqueta UNREAD en sus labelIds.`,
         ].join(" "),
       });
       if (!res.output) {
@@ -157,7 +178,9 @@ export class MailSync {
       const key = (t: MailThread) => `${t.threadId}@${t.date}`;
       const seen = new Set(this.store.seen);
       const fresh = threads.filter((t) => !seen.has(key(t)));
-      if (this.store.initialized && fresh.length) this.onNew(fresh);
+      // Se avisa solo lo nuevo y sin leer: lo que ya leíste en otro lado (el celular) no suena.
+      const freshUnread = fresh.filter((t) => t.unread);
+      if (this.store.initialized && freshUnread.length) this.onNew(freshUnread);
       this.store.seen = [...this.store.seen, ...fresh.map(key)].slice(-SEEN_LIMIT);
       this.store.initialized = true;
       await this.save();

@@ -136,6 +136,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // El timbre del pomodoro suena al cambiar de fase, sin que haya un clic en ese momento.
+      autoplayPolicy: "no-user-gesture-required",
     },
   });
   win.loadFile(join(__dirname, "index.html"));
@@ -156,6 +158,7 @@ function createWindow() {
         win?.close();
       });
   });
+  win.on("focus", () => mail.syncIfStale());
   win.on("closed", () => {
     win = null;
     ptys.killAll();

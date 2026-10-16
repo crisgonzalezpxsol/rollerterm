@@ -158,8 +158,10 @@ body { display: flex; flex-direction: column; }
 .panel + .panel { border-left: 1px solid #000; }
 
 .panel-head { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.panel-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
-.panel-status { color: var(--text-muted); }
+.panel-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.panel-status { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.panel-head > * { flex-shrink: 0; }
+.panel-head > .panel-status { flex-shrink: 1; }
 .panel-status::before { content: "●"; margin-right: 5px; color: var(--ended); }
 .panel-status[data-status="connected"]::before { color: #5ab37a; }
 .panel-status[data-status="loading"]::before { color: #d9a441; }
@@ -297,6 +299,11 @@ pre.detail[hidden] { display: none; }
 .mail-thread { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 5px; }
 .mail-thread:hover { background: #ffffff0d; }
 .mail-thread.vip { background: #d9a4411a; }
+.mail-thread.vip-last { margin-bottom: 6px; }
+.mail-thread::before { content: ""; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.mail-thread.unread::before { background: #3b8eea; }
+.mail-thread.unread .mt-subject, .mail-thread.unread .mt-from { font-weight: 600; }
+.mail-thread:not(.unread) .mt-subject, .mail-thread:not(.unread) .mt-from { color: var(--text-muted); }
 .mt-from { width: 150px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
 .mail-thread.vip .mt-from { color: #d9a441; font-weight: 600; }
 .mt-body { flex: 1; min-width: 0; display: flex; gap: 6px; overflow: hidden; white-space: nowrap; }
@@ -370,3 +377,17 @@ pre.detail[hidden] { display: none; }
 .browser-test:hover { filter: brightness(1.15); }
 .settings-saved { color: #5ab37a; }
 .settings-saved[hidden] { display: none; }
+#settings section + section { border-top: 1px solid #0006; }
+#settings label.check { justify-content: flex-start; gap: 8px; }
+#settings input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+#settings input[type="range"] { flex: 1; max-width: 320px; accent-color: var(--accent); }
+.pomo-test { height: 24px; padding: 0 12px; border: 1px solid #ffffff26; border-radius: 4px; background: transparent; color: var(--text); font: inherit; }
+.pomo-test:hover { background: #ffffff1a; }
+/* Importantes: el remitente siempre en amarillo, leído o no. */
+.mail-thread.vip .mt-from { color: #d9a441; }
+/* Correos que llegaron con la app abierta y todavía no abriste. */
+.mail-thread.new { background: #3ee8ff1f; box-shadow: inset 3px 0 0 #3ee8ff; }
+.mail-thread.new::before { background: #3ee8ff; }
+.mt-new { flex-shrink: 0; align-self: center; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: #3ee8ff; color: #0b0b12; }
+.mail-new-count { white-space: nowrap; padding: 1px 7px; border-radius: 9px; background: #3ee8ff; color: #0b0b12; font-weight: 700; font-size: 11px; }
+.mail-new-count[hidden] { display: none; }

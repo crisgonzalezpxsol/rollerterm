@@ -3,7 +3,7 @@ import "./styles.css";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import type { MenuCommand, Session, RollertermApi } from "../shared/types";
+import type { MenuCommand, Session, RollertermApi, Settings } from "../shared/types";
 import { mountAgenda } from "./agenda";
 import { mountMail } from "./mail";
 import { mountPomodoro } from "./pomodoro";
@@ -33,10 +33,20 @@ interface Tab {
 const tabsEl = document.getElementById("tabs") as HTMLDivElement;
 const panesEl = document.getElementById("panes") as HTMLDivElement;
 const newTabBtn = document.getElementById("new-tab") as HTMLButtonElement;
-const pomodoro = mountPomodoro(document.getElementById("pomodoro") as HTMLDivElement);
+// Configuración local para lo que se lee a cada rato (sonido del pomodoro); se actualiza
+// al arrancar y con cada cambio en la ventana de configuración.
+let settings: Settings | null = null;
+api.getSettings().then((s) => (settings = s));
+const pomodoro = mountPomodoro(
+  document.getElementById("pomodoro") as HTMLDivElement,
+  () => settings?.pomodoro ?? { ticking: true, bell: true, volume: 0.6 },
+);
 mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 mountMail(document.getElementById("mail") as HTMLElement, api);
-const settingsPanel = mountSettings(api, () => active?.term.focus());
+const settingsPanel = mountSettings(api, {
+  onClose: () => active?.term.focus(),
+  onChange: (s) => (settings = s),
+});
 document.getElementById("open-settings")!.addEventListener("click", () => void settingsPanel.open());
 
 let tabs: Tab[] = [];

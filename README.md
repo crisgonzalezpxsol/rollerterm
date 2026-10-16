@@ -4,8 +4,9 @@ App de escritorio (macOS) con dos mitades:
 
 - **Arriba, a la izquierda, la agenda:** tus reuniones de Google Calendar de las próximas 24 h,
   con aviso 5 minutos antes y al empezar cada llamada, y un botón para unirte.
-- **Arriba, a la derecha, el correo:** tus no leídos de Gmail, aviso de los nuevos, direcciones
-  importantes y bloqueadas, y un resumen cada 3 horas de lo que mandaron las importantes.
+- **Arriba, a la derecha, el correo:** tu bandeja de entrada de Gmail (leídos y no leídos), aviso
+  de los nuevos, direcciones importantes y bloqueadas, y un resumen cada 3 horas de lo que
+  mandaron las importantes.
 - **Abajo, la terminal:** pestañas con nombre, una por ticket o por funcionalidad. Las pestañas,
   sus nombres y el directorio donde quedó cada una se recuerdan al cerrar y se restauran al abrir.
 
@@ -98,11 +99,16 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 
 ### Correo
 
-- Muestra los **no leídos del inbox de las últimas 48 h** y se actualiza cada 5 minutos, al
-  despertar la Mac y con `↻`.
-- Avisa de cada correo nuevo; si llegan más de 2 juntos, en una sola notificación. Los de
-  direcciones **importantes (★)** se avisan siempre uno por uno y se destacan en amarillo. La
-  primera vez que abrís la app no avisa de lo que ya tenías sin leer.
+- Muestra **todo el inbox de las últimas 48 h** (sin spam ni papelera). Los no leídos van en
+  negrita con un punto azul.
+- Se revisa cada 5 minutos mientras usás la Mac y cada 15 si está inactiva hace 10 minutos o más.
+  También al despertar la Mac, al volver a la ventana (si pasaron más de 2 minutos) y con `↻`.
+- Los correos **nuevos** (que llegan con la app abierta) se destacan en **cian** con la etiqueta
+  NUEVO hasta que los abrís o los leés en otro lado; el encabezado muestra cuántos hay.
+- Avisa con notificación cada correo nuevo sin leer; si llegan más de 2 juntos, en una sola. La
+  primera vez que abrís la app no avisa de lo que ya tenías.
+- Las direcciones **importantes (★)** van **arriba de todo**, resaltadas en amarillo, y se avisan
+  siempre una por una.
 - Las direcciones **bloqueadas (🚫)** se excluyen de la búsqueda misma: no aparecen ni avisan.
   Podés bloquear un dominio entero (`empresa.com`). Una dirección no puede estar en las dos listas.
 - **Resumen de importantes:** cada 3 horas (si hay alguna dirección importante), Claude lee los
@@ -117,8 +123,8 @@ La app no guarda ninguna credencial de Google. Le pide los datos a Claude Code (
 usa los conectores de Google Calendar y Gmail de tu cuenta de claude.ai, con permiso **solo de
 lectura**: crear, modificar o borrar eventos y mandar, responder, borrar o etiquetar correos está
 prohibido explícitamente. Se usa el modelo Haiku y se bloquean los demás conectores para que cada
-consulta sea liviana. Uso aproximado de tu plan: agenda ~US$0,005 cada 10 min, correo ~US$0,01
-cada 5 min, y cada resumen ~US$0,05.
+consulta sea liviana. Uso aproximado de tu plan: agenda ~US$0,005 cada 10 min, correo ~US$0,015
+por revisión, y cada resumen ~US$0,05.
 
 ### Configuración
 
@@ -129,8 +135,13 @@ Con ⚙ o `⌘,`. Los cambios se guardan al instante en
   el del sistema. En Chrome, Brave, Edge y otros basados en Chromium también se elige el **perfil**
   (por ejemplo, el de la cuenta del trabajo, para que Meet y Gmail abran con esa cuenta). **Probar**
   abre Google Calendar con lo elegido.
+- **Pomodoro:** tictac sí/no, timbre sí/no y volumen.
 
 ### Pomodoro
+
+Suena un **tictac** de reloj mientras corre y un **timbre** en cada cambio de fase: un *ding* al
+empezar el descanso, uno suave al empezar la gracia y *ding-ding* al volver a trabajar. Se apagan
+o se ajusta el volumen en Configuración → Pomodoro (con **Probar sonido**).
 
 25 min de foco → 5 min de descanso → 1 min de gracia para acomodarse → foco otra vez, en ciclo,
 con una notificación en cada cambio de fase.

@@ -7,7 +7,10 @@ import { join } from "node:path";
 import { app, shell } from "electron";
 import type { BrowserInfo, Settings } from "../shared/types";
 
-const DEFAULTS: Settings = { browser: { appPath: null, profile: null } };
+const DEFAULTS: Settings = {
+  browser: { appPath: null, profile: null },
+  pomodoro: { ticking: true, bell: true, volume: 0.6 },
+};
 
 /**
  * Navegadores conocidos. `profilesDir` es la carpeta de datos de los basados en Chromium,
@@ -42,7 +45,10 @@ export class SettingsStore {
   async load(): Promise<void> {
     try {
       const saved = JSON.parse(await readFile(file(), "utf8")) as Partial<Settings>;
-      this.settings = { ...DEFAULTS, ...saved, browser: { ...DEFAULTS.browser, ...saved.browser } };
+      this.settings = {
+        browser: { ...DEFAULTS.browser, ...saved.browser },
+        pomodoro: { ...DEFAULTS.pomodoro, ...saved.pomodoro },
+      };
     } catch {
       // Primera vez o archivo corrupto: valores por defecto.
     }

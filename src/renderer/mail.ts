@@ -1,4 +1,4 @@
-// Panel de correo: no leídos, direcciones importantes/bloqueadas y resumen de importantes.
+// Panel de correo: bandeja de entrada, direcciones importantes/bloqueadas y resumen de importantes.
 // Los datos vienen del proceso main (MailSync); acá solo se pinta y se notifica.
 import type { MailState, MailSummary, MailThread, RollertermApi } from "../shared/types";
 import { connectionWatcher, detailControls, fmtTime, isDown, renderAlert, statusText } from "./connector";
@@ -18,8 +18,9 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
   root.classList.add("panel");
   root.innerHTML = `
     <div class="panel-head">
-      <h2>Correo · no leídos</h2>
+      <h2>Correo · recibidos</h2>
       <span class="panel-status"></span>
+      <span class="mail-new-count" hidden></span>
       <div class="panel-actions">
         <button class="panel-btn mail-summarize" title="Resumir lo que mandaron tus direcciones importantes en las últimas 24 h">Resumir</button>
         <button class="panel-btn mail-lists-toggle" title="Direcciones importantes y bloqueadas">Direcciones</button>
@@ -48,6 +49,7 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
     <ol class="panel-list mail-list"></ol>`;
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector(sel) as T;
   const statusEl = $<HTMLSpanElement>(".panel-status");
+  const newCountEl = $<HTMLSpanElement>(".mail-new-count");
   const refreshBtn = $<HTMLButtonElement>(".panel-refresh");
   const summarizeBtn = $<HTMLButtonElement>(".mail-summarize");
   const listsBtn = $<HTMLButtonElement>(".mail-lists-toggle");
@@ -57,6 +59,9 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
   const listEl = $<HTMLOListElement>(".mail-list");
 
   let state: MailState | null = null;
+  /** Hilos llegados mientras la app estaba abierta y que todavía no abriste ("threadId@fecha"). */
+  const fresh = new Set<string>();
+  const key = (t: MailThread) => `${t.threadId}@${t.date}`;
   /** createdAt del último resumen ya visto, para avisar solo de los nuevos. */
   let knownSummary: number | null | undefined;
   const watchConnection = connectionWatcher(LABEL, "Los avisos de correo pueden fallar.");
@@ -134,6 +139,8 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
   // ---------- avisos ----------
 
   api.onNewMail((threads) => {
+    for (const t of threads) fresh.add(key(t));
+    render();
     const vip = threads.filter((t) => isVip(t.fromEmail));
     const rest = threads.filter((t) => !isVip(t.fromEmail));
     // Los importantes siempre se avisan uno por uno.
@@ -171,8 +178,13 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
   function render() {
     if (!state) return;
     const { status, syncing, lastSync, message, detail } = state;
+    // Lo que ya se leyó (acá o en otro lado) deja de ser nuevo.
+    const unreadKeys = new Set(state.threads.filter((t) => t.unread).map(key));
+    for (const k of fresh) if (!unreadKeys.has(k)) fresh.delete(k);
     statusEl.dataset.status = status;
     statusEl.textContent = `${statusText(LABEL, status)}${lastSync ? ` · ${fmtTime(lastSync)}` : ""}`;
+    newCountEl.hidden = fresh.size === 0;
+    newCountEl.textContent = `${fresh.size} nuevo${fresh.size === 1 ? "" : "s"}`;
     refreshBtn.disabled = syncing;
     refreshBtn.classList.toggle("spinning", syncing);
     summarizeBtn.disabled = state.summarizing;
@@ -184,11 +196,15 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
     if (state.threads.length === 0) {
       const empty = document.createElement("li");
       empty.className = "panel-empty";
-      empty.textContent = status === "loading" ? "Leyendo tu correo…" : "Nada sin leer en las últimas 48 h.";
+      empty.textContent = status === "loading" ? "Leyendo tu correo…" : "Nada en la bandeja de entrada en las últimas 48 h.";
       listEl.append(empty);
       return;
     }
-    for (const t of state.threads) listEl.append(renderThread(t));
+    // Las direcciones importantes van primero; dentro de cada grupo, del más nuevo al más viejo.
+    const vip = state.threads.filter((t) => isVip(t.fromEmail));
+    const rest = state.threads.filter((t) => !isVip(t.fromEmail));
+    for (const t of [...vip, ...rest]) listEl.append(renderThread(t));
+    if (vip.length && rest.length) listEl.children[vip.length - 1].classList.add("vip-last");
   }
 
   function renderSummary() {
@@ -231,8 +247,15 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
     const li = document.createElement("li");
     li.className = "mail-thread";
     li.classList.toggle("vip", vip);
+    li.classList.toggle("unread", t.unread);
+    const isNew = fresh.has(key(t));
+    li.classList.toggle("new", isNew);
     li.title = "Abrir en Gmail";
-    li.addEventListener("click", () => window.open(t.viewUrl));
+    li.addEventListener("click", () => {
+      fresh.delete(key(t));
+      render();
+      window.open(t.viewUrl);
+    });
 
     const from = document.createElement("span");
     from.className = "mt-from";
@@ -270,6 +293,12 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
     });
     actions.append(star, block);
 
+    if (isNew) {
+      const badge = document.createElement("span");
+      badge.className = "mt-new";
+      badge.textContent = "NUEVO";
+      body.prepend(badge);
+    }
     li.append(from, body, time, actions);
     return li;
   }

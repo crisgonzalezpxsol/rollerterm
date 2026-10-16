@@ -1,6 +1,8 @@
 // Pomodoro en la barra de título: foco → descanso → gracia → foco…
 // La gracia es un minuto para acomodarse antes de volver a trabajar.
+import type { PomodoroSound } from "../shared/types";
 import { notify } from "./notify";
+import { bell, tick as tickSound } from "./sound";
 
 type Phase = "focus" | "break" | "grace";
 
@@ -16,7 +18,14 @@ export interface Pomodoro {
   reset(): void;
 }
 
-export function mountPomodoro(root: HTMLElement): Pomodoro {
+/** Timbre al entrar en cada fase: descanso "ding", gracia "ding" suave, trabajo "ding-ding". */
+const BELLS: Record<Phase, { times: number; soft: boolean }> = {
+  focus: { times: 2, soft: false },
+  break: { times: 1, soft: false },
+  grace: { times: 1, soft: true },
+};
+
+export function mountPomodoro(root: HTMLElement, sound: () => PomodoroSound): Pomodoro {
   const display = document.createElement("button");
   display.className = "pomo-display";
   const resetBtn = document.createElement("button");
@@ -32,6 +41,8 @@ export function mountPomodoro(root: HTMLElement): Pomodoro {
   let ticker: ReturnType<typeof setInterval> | undefined;
 
   const running = () => ticker !== undefined;
+  /** Último segundo mostrado: el tictac suena una vez por segundo, al cambiar el reloj. */
+  let lastSecs = -1;
 
   function render() {
     root.dataset.phase = phase ?? "idle";
@@ -44,6 +55,11 @@ export function mountPomodoro(root: HTMLElement): Pomodoro {
     }
     const ms = running() ? Math.max(0, endsAt - Date.now()) : remaining;
     const secs = Math.ceil(ms / 1000);
+    if (running() && secs !== lastSecs) {
+      lastSecs = secs;
+      const { ticking, volume } = sound();
+      if (ticking) tickSound(secs % 2 === 0 ? "tic" : "tac", volume);
+    }
     const mmss = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
     display.textContent = `${running() ? "" : "⏸ "}${PHASES[phase].label} ${mmss}`;
     display.title = running() ? "Pausar (⌘⇧P)" : "Continuar (⌘⇧P)";
@@ -57,6 +73,8 @@ export function mountPomodoro(root: HTMLElement): Pomodoro {
       // Si la app estuvo dormida y se saltearon fases, se alinea al presente.
       if (endsAt <= Date.now()) endsAt = Date.now() + PHASES[phase].ms;
       notify("rollerterm · Pomodoro", PHASES[done].notice);
+      const { bell: ring, volume } = sound();
+      if (ring) bell(volume, BELLS[phase].times, BELLS[phase].soft);
     }
     render();
   }
