@@ -451,3 +451,11 @@ pre.detail[hidden] { display: none; }
 #settings .rw-projects .settings-help { grid-column: 1 / -1; }
 #settings { max-height: calc(100vh - 40px); overflow-y: auto; }
 #settings h3 + label { margin-top: 10px; }
+.rw-bulk { display: flex; align-items: center; gap: 6px; margin: 10px 0 4px; color: var(--text-muted); }
+.rw-bulk[hidden] { display: none; }
+.rw-bulk span { margin-right: auto; }
+.rw-bulk button { height: 20px; padding: 0 8px; border: 1px solid #ffffff26; border-radius: 4px; background: transparent; color: var(--text-muted); font: inherit; font-size: 11px; }
+.rw-bulk button:hover { background: #ffffff1a; color: var(--text); }
+#settings .rw-projects small { color: var(--text-muted); }
+#settings section.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0%, 30% { background: #0064c833; } 100% { background: transparent; } }

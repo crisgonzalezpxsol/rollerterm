@@ -82,10 +82,15 @@ export class RailwayMonitor {
     this.railway ??= await findCommand("railway");
     if (!this.railway) return [];
     const { stdout } = await exec(this.railway.bin, ["list", "--json"], { env: this.railway.env, timeoutMs: 30_000 });
-    const parsed = JSON.parse(stdout) as { id: string; name: string; environments?: { edges: { node: { name: string } }[] } }[];
+    const parsed = JSON.parse(stdout) as {
+      id: string;
+      name: string;
+      environments?: { edges: { node: { name: string } }[] };
+      services?: { edges: unknown[] };
+    }[];
     const list = parsed
       .filter((p) => p.environments?.edges.some((e) => e.node.name === ENVIRONMENT))
-      .map((p) => ({ id: p.id, name: p.name }));
+      .map((p) => ({ id: p.id, name: p.name, services: p.services?.edges.length ?? 0 }));
     this.projects = { list, at: Date.now() };
     return list;
   }

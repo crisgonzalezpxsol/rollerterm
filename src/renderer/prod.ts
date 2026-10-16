@@ -107,9 +107,10 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
     const okCount = services.filter((x) => x.health === "ok").length;
     const problem = state.status !== "ok" && state.status !== "loading";
 
-    dot.dataset.health = problem ? "unknown" : state.status === "loading" ? "loading" : worst;
+    const none = state.status === "ok" && services.length === 0;
+    dot.dataset.health = problem || none ? "unknown" : state.status === "loading" ? "loading" : worst;
     text.textContent =
-      state.status === "loading" ? "Prod…" : problem ? "Prod ?" : `Prod ${okCount}/${services.length}`;
+      state.status === "loading" ? "Prod…" : problem ? "Prod ?" : none ? "Prod –" : `Prod ${okCount}/${services.length}`;
     badge.title = problem
       ? `Producción: ${state.message ?? ""}`
       : `Producción · ${HEALTH_LABEL[worst]}${state.lastCheck ? ` · revisado ${fmtTime(state.lastCheck)}` : ""}`;
@@ -127,6 +128,10 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
       .filter((x) => x.health !== "ok")
       .sort((a, b) => ORDER.indexOf(a.health) - ORDER.indexOf(b.health));
     const projects = new Set(services.map((x) => x.projectId)).size;
+    if (none) {
+      summary.textContent = "No hay proyectos elegidos para vigilar (o no tienen servicios en production).";
+      return;
+    }
     summary.textContent = bad.length
       ? `${okCount} de ${services.length} servicios OK en ${projects} proyectos.`
       : `Todo OK: ${services.length} servicios en ${projects} proyectos.`;

@@ -2,8 +2,11 @@
 import type { BrowserInfo, PomodoroSound, RailwayProject, RollertermApi, Settings } from "../shared/types";
 import { bell, tick } from "./sound";
 
+export type SettingsSection = "railway";
+
 export interface SettingsPanel {
-  open(): void;
+  /** Con `section`, abre directo en esa sección y la resalta. */
+  open(section?: SettingsSection): void;
 }
 
 export function mountSettings(
@@ -36,10 +39,15 @@ export function mountSettings(
         <button class="pomo-test">Probar sonido</button>
       </div>
     </section>
-    <section>
+    <section data-section="railway">
       <h3>Producción (Railway)</h3>
       <p class="settings-help">Indicador en la barra de título con la salud del entorno «production». Usa el CLI de Railway con tu sesión.</p>
       <label class="check"><input type="checkbox" class="rw-enabled" /> Mostrar el indicador de producción</label>
+      <div class="rw-bulk">
+        <span>Proyectos a vigilar</span>
+        <button class="rw-all">Todos</button>
+        <button class="rw-none">Ninguno</button>
+      </div>
       <div class="rw-projects"></div>
     </section>`;
   document.body.append(dialog);
@@ -55,6 +63,8 @@ export function mountSettings(
   const rwEnabled = $<HTMLInputElement>(".rw-enabled");
   const rwProjects = $<HTMLDivElement>(".rw-projects");
   let railwayProjects: RailwayProject[] = [];
+  /** false hasta la primera respuesta: lista vacía no significa "no hay proyectos" todavía. */
+  let projectsLoaded = false;
 
   let browsers: BrowserInfo[] = [];
   let settings: Settings | null = null;
@@ -89,11 +99,14 @@ export function mountSettings(
 
     rwEnabled.checked = settings.railway.enabled;
     rwProjects.hidden = !settings.railway.enabled;
+    $<HTMLDivElement>(".rw-bulk").hidden = !settings.railway.enabled || !railwayProjects.length;
     rwProjects.replaceChildren();
     if (!railwayProjects.length) {
       const empty = document.createElement("p");
       empty.className = "settings-help";
-      empty.textContent = "No se encontraron proyectos (¿está instalado y logueado el CLI de Railway?).";
+      empty.textContent = projectsLoaded
+        ? "No se encontraron proyectos (¿está instalado y logueado el CLI de Railway?)."
+        : "Cargando proyectos…";
       rwProjects.append(empty);
     }
     const watched = settings.railway.projects;
@@ -108,7 +121,9 @@ export function mountSettings(
         // Todos tildados = null: así un proyecto nuevo también se vigila.
         void save({ railway: { enabled: true, projects: ids.length === railwayProjects.length ? null : ids } });
       });
-      label.append(box, document.createTextNode(` ${p.name}`));
+      const count = document.createElement("small");
+      count.textContent = `${p.services} servicio${p.services === 1 ? "" : "s"}`;
+      label.append(box, document.createTextNode(` ${p.name} `), count);
       rwProjects.append(label);
     }
   }
@@ -147,6 +162,8 @@ export function mountSettings(
     setTimeout(() => bell(volume, 2), 2000);
   });
 
+  $<HTMLButtonElement>(".rw-all").addEventListener("click", () => void save({ railway: { enabled: true, projects: null } }));
+  $<HTMLButtonElement>(".rw-none").addEventListener("click", () => void save({ railway: { enabled: true, projects: [] } }));
   rwEnabled.addEventListener("change", () => {
     void save({ railway: { enabled: rwEnabled.checked, projects: settings!.railway.projects } });
   });
@@ -159,15 +176,26 @@ export function mountSettings(
   });
 
   return {
-    async open() {
-      // Se vuelve a leer cada vez: pudo instalarse un navegador o crearse un perfil.
+    async open(section) {
+      // Se abre ya con lo que se sabía y se completa cuando llegan los datos frescos: pudo
+      // instalarse un navegador, crearse un perfil o un proyecto de Railway.
+      settings ??= await api.getSettings();
+      render();
+      if (!dialog.open) dialog.showModal();
+      if (section) {
+        const el = dialog.querySelector<HTMLElement>(`[data-section="${section}"]`)!;
+        el.scrollIntoView({ block: "start" });
+        el.classList.remove("flash");
+        void el.offsetWidth; // reinicia la animación si ya estaba
+        el.classList.add("flash");
+      }
       [settings, browsers, railwayProjects] = await Promise.all([
         api.getSettings(),
         api.listBrowsers(),
         api.listRailwayProjects(),
       ]);
+      projectsLoaded = true;
       render();
-      if (!dialog.open) dialog.showModal();
     },
   };
 }

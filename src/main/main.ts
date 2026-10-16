@@ -40,7 +40,8 @@ ipcMain.handle("settings:set", async (_e, patch) => {
 });
 ipcMain.handle("prod:get", () => prod.current);
 ipcMain.on("prod:refresh", () => void prod.check());
-ipcMain.handle("prod:projects", () => prod.listProjects(true).catch(() => []));
+// Usa la lista en memoria del monitor (se refresca sola cada 30 min): así Configuración abre al instante.
+ipcMain.handle("prod:projects", () => prod.listProjects().catch(() => []));
 ipcMain.handle("settings:browsers", () => listBrowsers());
 ipcMain.on("settings:test-browser", () => settings.openUrl("https://calendar.google.com"));
 ipcMain.handle("calendar:get", () => calendar.current);

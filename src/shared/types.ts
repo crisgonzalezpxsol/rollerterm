@@ -208,4 +208,6 @@ export interface ProdState {
 export interface RailwayProject {
   id: string;
   name: string;
+  /** Cantidad de servicios del proyecto. */
+  services: number;
 }
