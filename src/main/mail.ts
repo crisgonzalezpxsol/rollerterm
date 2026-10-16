@@ -86,6 +86,7 @@ export class MailSync {
   private state: MailState = {
     status: "loading",
     message: null,
+    detail: null,
     syncing: false,
     summarizing: false,
     lastSync: null,
@@ -146,7 +147,7 @@ export class MailSync {
         ].join(" "),
       });
       if (!res.output) {
-        this.update({ status: res.status, message: res.message });
+        this.update({ status: res.status, message: res.message, detail: res.detail ?? null });
         return;
       }
       // El filtro de la búsqueda puede dejar pasar algo (Gmail busca por mensaje, no por hilo).
@@ -160,7 +161,7 @@ export class MailSync {
       this.store.seen = [...this.store.seen, ...fresh.map(key)].slice(-SEEN_LIMIT);
       this.store.initialized = true;
       await this.save();
-      this.update({ status: "connected", message: null, threads, lastSync: Date.now() });
+      this.update({ status: "connected", message: null, detail: null, threads, lastSync: Date.now() });
     } catch (err) {
       this.update({ status: "error", message: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -207,7 +208,7 @@ export class MailSync {
         ].join(" "),
       });
       if (!res.output) {
-        this.update({ summaryError: res.message ?? "No se pudo armar el resumen." });
+        this.update({ summaryError: res.message ?? "No se pudo armar el resumen.", detail: res.detail ?? null });
         return null;
       }
       const summary: MailSummary = { createdAt: now, since, overview: res.output.overview, items: res.output.items };

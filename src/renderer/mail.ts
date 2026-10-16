@@ -1,7 +1,7 @@
 // Panel de correo: no leídos, direcciones importantes/bloqueadas y resumen de importantes.
 // Los datos vienen del proceso main (MailSync); acá solo se pinta y se notifica.
 import type { MailState, MailSummary, MailThread, RollertermApi } from "../shared/types";
-import { connectionWatcher, fmtTime, renderAlert, statusText } from "./connector";
+import { connectionWatcher, detailControls, fmtTime, isDown, renderAlert, statusText } from "./connector";
 import { notify } from "./notify";
 
 const LABEL = "Gmail";
@@ -170,13 +170,13 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
 
   function render() {
     if (!state) return;
-    const { status, syncing, lastSync, message } = state;
+    const { status, syncing, lastSync, message, detail } = state;
     statusEl.dataset.status = status;
     statusEl.textContent = `${statusText(LABEL, status)}${lastSync ? ` · ${fmtTime(lastSync)}` : ""}`;
     refreshBtn.disabled = syncing;
     refreshBtn.classList.toggle("spinning", syncing);
     summarizeBtn.disabled = state.summarizing;
-    renderAlert(alertEl, LABEL, status, message);
+    renderAlert(alertEl, LABEL, status, message, isDown(status) ? detail : null);
     renderLists();
     renderSummary();
 
@@ -202,6 +202,8 @@ export function mountMail(root: HTMLElement, api: RollertermApi): void {
     const errorEl = summaryEl.querySelector(".ms-error") as HTMLParagraphElement;
     errorEl.hidden = !summaryError;
     errorEl.textContent = summaryError ?? "";
+    summaryEl.querySelectorAll(".detail-actions, .detail").forEach((n) => n.remove());
+    if (summaryError && state!.detail) errorEl.after(...detailControls(state!.detail));
     (summaryEl.querySelector(".ms-overview") as HTMLParagraphElement).textContent = summary?.overview ?? "";
     const items = summaryEl.querySelector(".ms-items") as HTMLOListElement;
     items.innerHTML = "";

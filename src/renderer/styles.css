@@ -33,6 +33,7 @@ body { display: flex; flex-direction: column; }
   user-select: none;
   flex-shrink: 0;
 }
+.app-logo { width: 22px; height: 22px; margin-right: 6px; }
 .app-name { color: var(--text-muted); font-weight: 600; }
 
 /* Mitad de arriba: agenda y correo. Mitad de abajo: terminales. */
@@ -186,6 +187,32 @@ body { display: flex; flex-direction: column; }
   flex-shrink: 0;
 }
 .panel-alert p { margin: 4px 0 0; color: var(--text-muted); user-select: text; }
+.detail-actions { display: flex; gap: 6px; margin-top: 6px; }
+.detail-actions button {
+  height: 20px;
+  padding: 0 8px;
+  border: 1px solid #ffffff26;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+}
+.detail-actions button:hover { background: #ffffff1a; color: var(--text); }
+pre.detail {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  max-height: 160px;
+  overflow: auto;
+  background: #111;
+  border-radius: 4px;
+  font: 11px Menlo, monospace;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+pre.detail[hidden] { display: none; }
 
 .panel-list { list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; }
 .panel-empty { color: var(--text-muted); padding: 8px 0; }

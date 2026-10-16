@@ -128,6 +128,11 @@ La sesión de pestañas se guarda en `~/Library/Application Support/rollerterm/s
 
 ## Problemas comunes
 
+Si un panel muestra un cartel rojo, tocá **Copiar detalle**: copia qué pasó exactamente (estado del
+conector, qué respondió, errores de Claude Code) para pegarlo en un mensaje o un ticket. Cada fallo
+también queda guardado en `~/Library/Application Support/rollerterm/claude.log`. Antes de mostrar
+el cartel, la app reintenta una vez sola: los conectores de claude.ai a veces tropiezan unos segundos.
+
 | Síntoma | Solución |
 | --- | --- |
 | Cualquier panel: **Claude Code no encontrado** | Instalá Claude Code (paso 1) y verificá que `claude --version` funcione en una terminal nueva. Después reabrí la app. |
@@ -149,4 +154,7 @@ src/main/       proceso principal: ventana, menú/atajos, una shell (pty) por pe
 src/preload/    puente aislado: expone window.rollerterm a la ventana (sin Node en el renderer)
 src/renderer/   la ventana: agenda, correo, pomodoro, barra de pestañas y una terminal xterm por pestaña
 src/shared/     tipos compartidos (Session, CalendarState, MailState, MenuCommand, RollertermApi)
+assets/         logo.svg (fuente) e icon.png (ícono del Dock)
 ```
+
+Si cambiás `assets/logo.svg`, regenerá el PNG con `npx electron scripts/render-icon.cjs`.

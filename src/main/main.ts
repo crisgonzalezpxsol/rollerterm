@@ -142,6 +142,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Sin empaquetar, macOS mostraría el ícono genérico de Electron en el Dock.
+  app.dock?.setIcon(join(__dirname, "icon.png"));
   buildMenu();
   createWindow();
   calendar.start();

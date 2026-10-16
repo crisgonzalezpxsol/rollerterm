@@ -33,7 +33,7 @@ const EVENTS_SCHEMA = {
 };
 
 export class CalendarSync {
-  private state: CalendarState = { status: "loading", events: [], lastSync: null, message: null, syncing: false };
+  private state: CalendarState = { status: "loading", events: [], lastSync: null, message: null, detail: null, syncing: false };
 
   constructor(
     private claude: ClaudeRunner,
@@ -66,9 +66,9 @@ export class CalendarSync {
         const events = res.output.events
           .filter((e) => e.start.includes("T") && !Number.isNaN(Date.parse(e.start)))
           .map((e) => ({ ...e, title: e.title.trim() }));
-        this.update({ status: res.status, message: null, events, lastSync: Date.now() });
+        this.update({ status: res.status, message: null, detail: null, events, lastSync: Date.now() });
       } else {
-        this.update({ status: res.status, message: res.message });
+        this.update({ status: res.status, message: res.message, detail: res.detail ?? null });
       }
     } catch (err) {
       this.update({ status: "error", message: err instanceof Error ? err.message : String(err) });

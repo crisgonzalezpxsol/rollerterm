@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- rollerterm: patín quad estilo grafiti (contorno grueso, chorreado, líneas de velocidad). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a1745"/>
+      <stop offset="1" stop-color="#0f0f1c"/>
+    </linearGradient>
+    <linearGradient id="boot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff3d9a"/>
+      <stop offset="0.55" stop-color="#ff6a3d"/>
+      <stop offset="1" stop-color="#ffc23d"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.55" r="0.5">
+      <stop offset="0" stop-color="#ff3d9a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ff3d9a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Fondo tipo app de macOS -->
+  <rect x="32" y="32" width="960" height="960" rx="215" fill="url(#bg)"/>
+  <circle cx="540" cy="560" r="420" fill="url(#glow)"/>
+
+  <!-- Salpicaduras de aerosol -->
+  <g fill="#3ee8ff" opacity="0.8">
+    <circle cx="196" cy="236" r="14"/><circle cx="236" cy="200" r="7"/><circle cx="170" cy="290" r="6"/>
+    <circle cx="842" cy="214" r="11"/><circle cx="872" cy="262" r="6"/><circle cx="806" cy="186" r="5"/>
+  </g>
+
+  <!-- Líneas de velocidad -->
+  <g stroke="#ffe14d" stroke-width="30" stroke-linecap="round" fill="none">
+    <path d="M110 470 H230"/>
+    <path d="M80 560 H220"/>
+    <path d="M130 650 H210"/>
+  </g>
+
+  <!-- Bota del patín: contorno negro grueso + relleno degradado -->
+  <g stroke="#0b0b12" stroke-width="30" stroke-linejoin="round" stroke-linecap="round">
+    <path fill="url(#boot)" d="M318 236 H548 Q596 236 596 284 V468 Q620 520 712 540 Q818 562 822 640 V700 H262 V612 Q262 572 284 548 L298 286 Q302 236 318 236 Z"/>
+    <!-- Puntera -->
+    <path fill="#ffffff" d="M712 540 Q818 562 822 640 V700 H700 V600 Q700 556 712 540 Z"/>
+    <!-- Plancha -->
+    <rect x="240" y="696" width="604" height="46" rx="18" fill="#2b2b3a"/>
+    <!-- Ruedas -->
+    <circle cx="352" cy="808" r="78" fill="#3ee8ff"/>
+    <circle cx="722" cy="808" r="78" fill="#3ee8ff"/>
+  </g>
+
+  <!-- Bujes de las ruedas -->
+  <circle cx="352" cy="808" r="26" fill="#ffe14d" stroke="#0b0b12" stroke-width="14"/>
+  <circle cx="722" cy="808" r="26" fill="#ffe14d" stroke="#0b0b12" stroke-width="14"/>
+
+  <!-- Cordones -->
+  <g stroke="#ffffff" stroke-width="16" stroke-linecap="round">
+    <path d="M520 300 L576 336 M576 300 L520 336"/>
+    <path d="M520 370 L576 406 M576 370 L520 406"/>
+    <path d="M540 440 L600 480 M600 440 L540 480"/>
+  </g>
+
+  <!-- Chorreado de pintura desde la bota -->
+  <g fill="#ff3d9a">
+    <path d="M430 700 V880 Q430 906 450 906 Q470 906 470 880 V700 Z"/>
+    <circle cx="450" cy="940" r="16"/>
+    <path d="M560 700 V830 Q560 852 576 852 Q592 852 592 830 V700 Z"/>
+  </g>
+
+  <!-- Brillos estilo grafiti -->
+  <g stroke="#ffffff" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.9">
+    <path d="M336 300 L326 470"/>
+    <path d="M330 520 L328 548"/>
+  </g>
+  <path fill="#ffffff" d="M792 360 L806 404 L850 418 L806 432 L792 476 L778 432 L734 418 L778 404 Z"/>
+</svg>

@@ -62,14 +62,14 @@ export function mountAgenda(root: HTMLElement, api: RollertermApi): void {
 
   function render() {
     if (!state) return;
-    const { status, syncing, lastSync, message } = state;
+    const { status, syncing, lastSync, message, detail } = state;
     statusEl.dataset.status = status;
     const synced = lastSync ? ` · ${fmtTime(lastSync)}` : "";
     statusEl.textContent = `${statusText(LABEL, status)}${synced}`;
     refreshBtn.disabled = syncing;
     refreshBtn.classList.toggle("spinning", syncing);
 
-    renderAlert(alertEl, LABEL, status, message);
+    renderAlert(alertEl, LABEL, status, message, detail);
 
     const now = Date.now();
     const upcoming = state.events.filter((e) => Date.parse(e.end) > now);

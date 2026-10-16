@@ -47,16 +47,54 @@ export function connectionWatcher(label: string, consequence: string): (status: 
   };
 }
 
-/** Pinta el cartel rojo con el problema y cómo arreglarlo. */
-export function renderAlert(el: HTMLElement, label: string, status: ConnectorStatus, message: string | null): void {
+/** Pinta el cartel rojo con el problema, cómo arreglarlo y el detalle técnico para copiar. */
+export function renderAlert(
+  el: HTMLElement,
+  label: string,
+  status: ConnectorStatus,
+  message: string | null,
+  detail: string | null,
+): void {
   el.hidden = !isDown(status);
   if (el.hidden) return;
+  // El detalle abierto se mantiene abierto aunque el panel se vuelva a pintar.
+  const wasOpen = !!el.querySelector("pre:not([hidden])");
   el.innerHTML = "";
   const title = document.createElement("strong");
   title.textContent = statusText(label, status);
-  const detail = document.createElement("p");
-  detail.textContent = [message, fixText(label, status)].filter(Boolean).join(" ");
-  el.append(title, detail);
+  const text = document.createElement("p");
+  text.textContent = [message, fixText(label, status)].filter(Boolean).join(" ");
+  el.append(title, text);
+  if (detail) el.append(...detailControls(detail, wasOpen));
+}
+
+/** Botones "Ver detalle" / "Copiar detalle" y el bloque con el texto técnico. */
+export function detailControls(detail: string, open = false): HTMLElement[] {
+  const pre = document.createElement("pre");
+  pre.className = "detail";
+  pre.textContent = detail;
+  pre.hidden = !open;
+  const actions = document.createElement("div");
+  actions.className = "detail-actions";
+  const toggle = document.createElement("button");
+  toggle.textContent = open ? "Ocultar detalle" : "Ver detalle";
+  toggle.addEventListener("click", () => {
+    pre.hidden = !pre.hidden;
+    toggle.textContent = pre.hidden ? "Ver detalle" : "Ocultar detalle";
+  });
+  const copy = document.createElement("button");
+  copy.textContent = "Copiar detalle";
+  copy.addEventListener("click", () => {
+    navigator.clipboard.writeText(detail).then(
+      () => {
+        copy.textContent = "¡Copiado!";
+        setTimeout(() => (copy.textContent = "Copiar detalle"), 1500);
+      },
+      (err) => console.error("[copiar detalle]", err),
+    );
+  });
+  actions.append(toggle, copy);
+  return [actions, pre];
 }
 
 export function fmtTime(ms: number): string {

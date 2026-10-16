@@ -73,6 +73,8 @@ export interface CalendarState {
   events: CalendarEvent[];
   lastSync: number | null;
   message: string | null;
+  /** Detalle técnico del último fallo, para copiar. */
+  detail: string | null;
   syncing: boolean;
 }
 
@@ -111,6 +113,8 @@ export interface MailSummary {
 export interface MailState {
   status: ConnectorStatus;
   message: string | null;
+  /** Detalle técnico del último fallo (de la sincronización o del resumen), para copiar. */
+  detail: string | null;
   syncing: boolean;
   summarizing: boolean;
   lastSync: number | null;
