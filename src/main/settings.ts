@@ -13,6 +13,7 @@ const DEFAULTS: Settings = {
   railway: { enabled: true, projects: null },
   tickets: { enabled: true, server: null },
   muted: false,
+  assistant: { model: "sonnet" },
 };
 
 /**
@@ -54,6 +55,7 @@ export class SettingsStore {
         railway: { ...DEFAULTS.railway, ...saved.railway },
         tickets: { ...DEFAULTS.tickets, ...saved.tickets },
         muted: saved.muted ?? DEFAULTS.muted,
+        assistant: { ...DEFAULTS.assistant, ...saved.assistant },
       };
     } catch {
       // Primera vez o archivo corrupto: valores por defecto.

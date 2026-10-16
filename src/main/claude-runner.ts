@@ -30,8 +30,12 @@ interface RunOutput {
   exitError: string | null;
 }
 
-/** Si el conector todavía se estaba conectando, se reintenta una vez después de esta pausa. */
-const RETRY_DELAY_MS = 8_000;
+/**
+ * Pausas entre reintentos cuando el conector no respondió. Lo típico es que estuviera
+ * "pending" (todavía conectando): Claude arranca sin esperar a los conectores de claude.ai, y
+ * si no llegaron a conectar, el modelo no tiene la herramienta.
+ */
+const RETRY_DELAYS_MS = [8_000, 20_000];
 const LOG_MAX_BYTES = 1_000_000;
 
 export interface QueryOptions {
@@ -61,16 +65,43 @@ export class ClaudeRunner {
   private servers: string[] | null = null;
   private probing: Promise<void> | null = null;
 
-  async query<T>(opts: QueryOptions): Promise<QueryResult<T>> {
+  /** El comando `claude` (con el PATH de la terminal), o null si no está instalado. */
+  async command(): Promise<Command | null> {
+    this.claude ??= await findCommand("claude");
+    return this.claude;
+  }
+
+  /** Nombres de todos los servidores MCP de la cuenta (se averiguan una vez). */
+  async serverNames(): Promise<string[]> {
+    if (!(await this.command())) return [];
+    if (!this.servers) await (this.probing ??= this.probe().finally(() => (this.probing = null)));
+    return this.servers ?? [];
+  }
+
+  /** Las consultas de fondo van en fila, una por vez (ver `query`). */
+  private queue: Promise<unknown> = Promise.resolve();
+
+  /**
+   * Consulta de fondo (agenda, correo, resúmenes). Van de a una: varias instancias de Claude
+   * Code a la vez hacen que los conectores de claude.ai tarden más en conectar y queden
+   * "pending" justo cuando el modelo los necesita. Solas conectan en ~3 s.
+   */
+  query<T>(opts: QueryOptions): Promise<QueryResult<T>> {
+    const run = this.queue.then(() => this.queryNow<T>(opts));
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async queryNow<T>(opts: QueryOptions): Promise<QueryResult<T>> {
     this.claude ??= await findCommand("claude");
     if (!this.claude) return { status: "no-claude", message: "No se encontró el comando `claude` (Claude Code)." };
     if (!this.servers) await (this.probing ??= this.probe().finally(() => (this.probing = null)));
 
     let res = await this.attempt<T>(opts);
-    // Los conectores de claude.ai a veces tardan en conectarse o cortan una respuesta: un
-    // reintento evita marcar "desconectado" por un tropiezo pasajero.
-    if (res.status === "disconnected" || res.status === "error") {
-      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    // Un conector que tropieza unos segundos no se marca como desconectado: se reintenta.
+    for (const delay of RETRY_DELAYS_MS) {
+      if (res.status !== "disconnected" && res.status !== "error") break;
+      await new Promise((r) => setTimeout(r, delay));
       res = await this.attempt<T>(opts);
     }
     if (res.detail) void log(res.detail);
@@ -192,7 +223,7 @@ export class ClaudeRunner {
 }
 
 /** Nombre de servidor MCP → prefijo de sus herramientas ("claude.ai Gmail" → "mcp__claude_ai_Gmail"). */
-function mcpPrefix(server: string): string {
+export function mcpPrefix(server: string): string {
   return `mcp__${server.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 }
 

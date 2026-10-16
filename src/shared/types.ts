@@ -23,6 +23,7 @@ export type MenuCommand =
   | "open-settings"
   | "toggle-notes"
   | "toggle-mute"
+  | "toggle-assistant"
   | `goto-tab:${number}`;
 
 /** API que el preload expone a la ventana como `window.rollerterm`. */
@@ -64,6 +65,15 @@ export interface RollertermApi {
   listNotes(): Promise<Note[]>;
   saveNote(note: Note): Promise<void>;
   deleteNote(id: string): Promise<void>;
+  chatHistory(): Promise<ChatMessage[]>;
+  chatSend(text: string): Promise<void>;
+  chatStop(): void;
+  chatApprove(id: string, approved: boolean): void;
+  onChat(cb: (event: ChatStreamEvent) => void): void;
+  /** Avisa que las notas cambiaron desde afuera del panel (por ejemplo, las creó el asistente). */
+  onNotesChanged(cb: () => void): void;
+  /** Un recordatorio que acaba de sonar. */
+  onReminder(cb: (reminder: Reminder) => void): void;
 }
 
 /** Un evento de Google Calendar tal como lo devuelve Claude Code. */
@@ -179,6 +189,7 @@ export interface Settings {
   tickets: TicketsSettings;
   /** Silencio: sin sonidos ni notificaciones (todo lo demás sigue igual). */
   muted: boolean;
+  assistant: AssistantSettings;
 }
 
 export interface BrowserInfo {
@@ -270,4 +281,50 @@ export interface Note {
   text: string;
   createdAt: number;
   updatedAt: number;
+}
+
+// ---------- asistente (chat con Claude Code) ----------
+
+/** Un mensaje del historial del chat. */
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "event";
+  text: string;
+  at: number;
+  /** Herramientas que usó Claude para responder (solo en role "assistant"). */
+  tools?: string[];
+  /** Si la respuesta terminó con error (cortada, sin sesión, etc.). */
+  error?: boolean;
+}
+
+/** Algo que Claude quiere hacer y que necesita el OK del usuario. */
+export interface ApprovalRequest {
+  id: string;
+  tool: string;
+  /** Descripción en castellano de lo que va a pasar. */
+  summary: string;
+  input: Record<string, unknown>;
+}
+
+/** Eventos de una respuesta en curso, para pintarla mientras llega. */
+export type ChatStreamEvent =
+  | { type: "start"; messageId: string }
+  | { type: "text"; messageId: string; delta: string }
+  | { type: "tool"; messageId: string; label: string }
+  | { type: "approval"; request: ApprovalRequest }
+  | { type: "approval-done"; id: string; approved: boolean }
+  | { type: "done"; message: ChatMessage }
+  | { type: "event"; message: ChatMessage };
+
+export interface Reminder {
+  id: string;
+  /** ISO. */
+  when: string;
+  text: string;
+  done: boolean;
+}
+
+export interface AssistantSettings {
+  /** Alias de modelo de Claude Code: "sonnet", "opus", "haiku". */
+  model: string;
 }

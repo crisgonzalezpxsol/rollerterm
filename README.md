@@ -11,8 +11,8 @@ App de escritorio (macOS) con dos mitades:
 - **Abajo, la terminal:** pestañas con nombre, una por ticket o por funcionalidad. Las pestañas,
   sus nombres y el directorio donde quedó cada una se recuerdan al cerrar y se restauran al abrir.
 
-Y en la barra de arriba: un indicador de **producción en Railway**, un pomodoro y un panel
-lateral de **notas**.
+Y en la barra de arriba: un indicador de **producción en Railway**, un pomodoro, un **asistente**
+(chat con Claude Code que recuerda tu jornada) y un panel lateral de **notas**.
 
 ## Instalación desde cero
 
@@ -90,6 +90,7 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 | Resumir lo de las importantes ahora | botón **Resumir** (últimas 24 h) |
 | Abrir un ticket | clic en la fila (se abre en Pxsol Agencias) |
 | Ver qué servicios de producción no están OK | clic en **Prod N/M** arriba a la derecha (clic en un servicio lo abre en Railway) |
+| Asistente (abrir / cerrar el chat) | 💬 arriba a la derecha · `⌘⇧K` · `Esc` o `⌘W` lo cierran |
 | Notas (abrir / cerrar el panel lateral) | 📝 arriba a la derecha · `⌘⇧N` · `Esc` o `⌘W` lo cierran |
 | Silenciar sonidos y avisos | 🔔/🔕 arriba a la derecha · `⌘⇧M` |
 | Configuración | ⚙ arriba a la derecha · `⌘,` |
@@ -173,6 +174,30 @@ El botón 🔔 de la barra de título (o `⌘⇧M`) silencia la app de una: sin 
 pomodoro y sin ninguna notificación (llamadas, correos, tickets, producción). Todo lo demás
 sigue funcionando y a la vista. Se ve 🔕 mientras está silenciada y se recuerda al cerrar la app.
 
+### Asistente
+
+Un chat con Claude Code (💬 o `⌘⇧K`) para ir contándole la jornada y pedirle cosas:
+«¿qué tengo hoy?», «recordame a las 15 llamar a René», «anotá que…», «resumime los correos de
+Jorge de esta semana», «respondele a … que …».
+
+- **Recuerda.** Cada día es una conversación (cada mensaje del día sigue la misma sesión de
+  Claude). Lo que conviene recordar, Claude lo va guardando en su carpeta:
+  `memoria.md` (lo durable: personas, proyectos, compromisos) y `diario/AAAA-MM-DD.md` (lo de cada
+  día). Cuando le preguntás por otro día, lo busca ahí. Todo queda en
+  `~/Library/Application Support/rollerterm/asistente/` (también el historial del chat, `chat.jsonl`).
+- **Hace.** Crea **notas** (aparecen en el panel de notas) y **recordatorios** (a la hora suena
+  una notificación y aparece en el chat). Busca, lee y resume **correos**, **agenda** y
+  **tickets**, y ve lo que la app ya está mostrando sin volver a consultarlo.
+- **Pregunta antes.** Todo lo que tiene efecto afuera — **enviar o responder un correo**, crear o
+  cambiar un evento, comentar o cambiar un ticket — aparece en el chat como una tarjeta con lo
+  que va a hacer exactamente (destinatario, asunto, cuándo, texto) y se ejecuta recién cuando
+  tocás **Aprobar**. Los borradores de correo los crea sin preguntar (no salen de tu cuenta).
+- **Modelo:** Sonnet por defecto; se cambia en Configuración → Asistente (Opus, más capaz; Haiku,
+  más rápido). Usa el uso de tu plan de Claude como cualquier conversación.
+- Por dentro: `claude -p` con `--resume` por día, un servidor MCP propio de la app
+  (`rollerterm-mcp.cjs`, registrado en la carpeta del asistente) y `--permission-prompt-tool`
+  para las aprobaciones. Solo se cargan los conectores que usa (Gmail, Calendar, tickets).
+
 ### Notas
 
 Un panel lateral que se desliza desde la derecha, encima de todo, y no ocupa lugar en la
@@ -191,6 +216,7 @@ Con ⚙ o `⌘,`. Los cambios se guardan al instante en
   (por ejemplo, el de la cuenta del trabajo, para que Meet y Gmail abran con esa cuenta). **Probar**
   abre Google Calendar con lo elegido.
 - **Pomodoro:** tictac sí/no, timbre sí/no y volumen.
+- **Asistente:** modelo (Sonnet, Opus o Haiku).
 - **Tickets:** mostrar u ocultar el panel y qué servidor MCP usar.
 - **Producción (Railway):** mostrar u ocultar el indicador y qué proyectos vigilar.
 
@@ -236,7 +262,9 @@ Electron + [xterm.js](https://xtermjs.org) + [node-pty](https://github.com/micro
 src/main/       proceso principal: ventana, menú/atajos, una shell (pty) por pestaña, sesión,
                 agenda y correo vía Claude Code (claude-runner.ts, calendar.ts, mail.ts),
                 producción vía Railway CLI (railway.ts), tickets vía su MCP (tickets.ts,
-                mcp-client.ts), notas (notes.ts), configuración (settings.ts)
+                mcp-client.ts), notas (notes.ts), asistente (assistant.ts, bridge.ts,
+                reminders.ts), configuración (settings.ts)
+src/mcp/        servidor MCP de rollerterm que usa el asistente (notas, recordatorios, aprobaciones)
 src/preload/    puente aislado: expone window.rollerterm a la ventana (sin Node en el renderer)
 src/renderer/   la ventana: agenda, correo, tickets, notas, pomodoro, barra de pestañas y una terminal
                 xterm por pestaña

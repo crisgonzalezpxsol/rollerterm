@@ -190,6 +190,10 @@ export function mountNotes(api: RollertermApi, onClose: () => void): NotesPanel 
       onClose();
     },
   };
+  // Una nota creada por el asistente aparece sin tener que cerrar y abrir el panel.
+  api.onNotesChanged(() => {
+    if (open && !current) void load();
+  });
   // Al salir de la app no se pierde lo último que se tipeó.
   window.addEventListener("beforeunload", flush);
   return panel;

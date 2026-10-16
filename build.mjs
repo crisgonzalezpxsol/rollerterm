@@ -16,3 +16,4 @@ await Promise.all([
 await copyFile("src/renderer/index.html", "dist/index.html");
 await copyFile("assets/logo.svg", "dist/logo.svg");
 await copyFile("assets/icon.png", "dist/icon.png");
+await copyFile("src/mcp/rollerterm-mcp.cjs", "dist/rollerterm-mcp.cjs");

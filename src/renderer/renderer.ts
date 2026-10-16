@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { MenuCommand, Session, RollertermApi, Settings } from "../shared/types";
 import { mountAgenda } from "./agenda";
+import { mountAssistant } from "./assistant";
 import { mountMail } from "./mail";
 import { mountNotes } from "./notes";
 import { setMuted } from "./notify";
@@ -61,7 +62,14 @@ mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 mountMail(document.getElementById("mail") as HTMLElement, api);
 mountTickets(document.getElementById("tickets") as HTMLElement, api);
 const notesPanel = mountNotes(api, () => active?.term.focus());
-document.getElementById("toggle-notes")!.addEventListener("click", () => notesPanel.toggle());
+// Un panel lateral a la vez: abrir el chat cierra las notas y al revés.
+const assistantPanel = mountAssistant(api, { onOpen: () => notesPanel.close(), onClose: () => active?.term.focus() });
+const toggleNotes = () => {
+  if (!notesPanel.isOpen) assistantPanel.close();
+  notesPanel.toggle();
+};
+document.getElementById("toggle-notes")!.addEventListener("click", toggleNotes);
+document.getElementById("toggle-assistant")!.addEventListener("click", () => assistantPanel.toggle());
 const settingsPanel = mountSettings(api, {
   onClose: () => active?.term.focus(),
   onChange: applySettings,
@@ -274,7 +282,9 @@ api.onMenu((cmd: MenuCommand) => {
   if (cmd === "new-tab") createTab();
   // Con las notas abiertas, ⌘W las cierra en vez de cerrar la pestaña de la terminal.
   else if (cmd === "close-tab" && notesPanel.isOpen) notesPanel.close();
-  else if (cmd === "toggle-notes") notesPanel.toggle();
+  else if (cmd === "close-tab" && assistantPanel.isOpen) assistantPanel.close();
+  else if (cmd === "toggle-notes") toggleNotes();
+  else if (cmd === "toggle-assistant") assistantPanel.toggle();
   else if (cmd === "toggle-mute") void toggleMute();
   else if (cmd === "close-tab" && active) closeTab(active);
   else if (cmd === "rename-tab" && active) startRename(active);

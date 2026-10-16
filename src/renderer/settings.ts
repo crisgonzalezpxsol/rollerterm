@@ -2,7 +2,7 @@
 import type { BrowserInfo, PomodoroSound, RailwayProject, RollertermApi, Settings } from "../shared/types";
 import { bell, tick } from "./sound";
 
-export type SettingsSection = "railway" | "tickets";
+export type SettingsSection = "railway" | "tickets" | "assistant";
 
 export interface SettingsPanel {
   /** Con `section`, abre directo en esa sección y la resalta. */
@@ -39,6 +39,15 @@ export function mountSettings(
         <button class="pomo-test">Probar sonido</button>
       </div>
     </section>
+    <section data-section="assistant">
+      <h3>Asistente</h3>
+      <p class="settings-help">El chat de la jornada (💬). El historial y la memoria quedan en tu Mac.</p>
+      <label>Modelo <select class="as-model">
+        <option value="sonnet">Sonnet — equilibrado (recomendado)</option>
+        <option value="opus">Opus — más capaz, más lento</option>
+        <option value="haiku">Haiku — más rápido y liviano</option>
+      </select></label>
+    </section>
     <section data-section="tickets">
       <h3>Tickets (Pxsol Agencias)</h3>
       <p class="settings-help">Tabla debajo de la agenda. Usa el MCP de tickets que tengas configurado en Claude Code, solo para leer.</p>
@@ -70,6 +79,7 @@ export function mountSettings(
   const rwProjects = $<HTMLDivElement>(".rw-projects");
   let railwayProjects: RailwayProject[] = [];
   let mcpServers: string[] = [];
+  const asModel = $<HTMLSelectElement>(".as-model");
   const tkEnabled = $<HTMLInputElement>(".tk-enabled");
   const tkServer = $<HTMLSelectElement>(".tk-server");
   /** false hasta la primera respuesta: lista vacía no significa "no hay proyectos" todavía. */
@@ -106,6 +116,7 @@ export function mountSettings(
     bellBox.checked = settings.pomodoro.bell;
     volumeRange.value = String(settings.pomodoro.volume);
 
+    asModel.value = settings.assistant.model;
     tkEnabled.checked = settings.tickets.enabled;
     $<HTMLLabelElement>(".tk-server-row").hidden = !settings.tickets.enabled;
     tkServer.replaceChildren(option("", "Automático (el primero de tickets)"), ...mcpServers.map((n) => option(n, n)));
@@ -181,6 +192,7 @@ export function mountSettings(
 
   $<HTMLButtonElement>(".rw-all").addEventListener("click", () => void save({ railway: { enabled: true, projects: null } }));
   $<HTMLButtonElement>(".rw-none").addEventListener("click", () => void save({ railway: { enabled: true, projects: [] } }));
+  asModel.addEventListener("change", () => void save({ assistant: { model: asModel.value } }));
   tkEnabled.addEventListener("change", () => void save({ tickets: { enabled: tkEnabled.checked, server: settings!.tickets.server } }));
   tkServer.addEventListener("change", () => void save({ tickets: { enabled: true, server: tkServer.value || null } }));
   rwEnabled.addEventListener("change", () => {

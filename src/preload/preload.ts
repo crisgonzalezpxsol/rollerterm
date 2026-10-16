@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { CalendarState, MailState, MailThread, MenuCommand, ProdState, Session, RollertermApi, TicketsState } from "../shared/types";
+import type { CalendarState, ChatStreamEvent, Reminder, MailState, MailThread, MenuCommand, ProdState, Session, RollertermApi, TicketsState } from "../shared/types";
 
 const api: RollertermApi = {
   createPty: (id, cwd, cols, rows) => ipcRenderer.invoke("pty:create", id, cwd, cols, rows),
@@ -24,6 +24,13 @@ const api: RollertermApi = {
   setSettings: (patch) => ipcRenderer.invoke("settings:set", patch),
   listBrowsers: () => ipcRenderer.invoke("settings:browsers"),
   testBrowser: () => ipcRenderer.send("settings:test-browser"),
+  chatHistory: () => ipcRenderer.invoke("chat:history"),
+  chatSend: (text) => ipcRenderer.invoke("chat:send", text),
+  chatStop: () => ipcRenderer.send("chat:stop"),
+  chatApprove: (id, approved) => ipcRenderer.send("chat:approve", id, approved),
+  onChat: (cb) => ipcRenderer.on("chat:event", (_e, event: ChatStreamEvent) => cb(event)),
+  onNotesChanged: (cb) => ipcRenderer.on("notes:changed", () => cb()),
+  onReminder: (cb) => ipcRenderer.on("reminder:fire", (_e, r: Reminder) => cb(r)),
   listNotes: () => ipcRenderer.invoke("notes:list"),
   saveNote: (note) => ipcRenderer.invoke("notes:save", note),
   deleteNote: (id) => ipcRenderer.invoke("notes:delete", id),

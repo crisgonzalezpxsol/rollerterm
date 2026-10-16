@@ -11,7 +11,7 @@ const LIMIT = 50;
 type Listed = Omit<Ticket, "mine">;
 
 /** El servidor elegido o, si no hay elección, el primero que parezca de tickets. */
-async function resolveServer(cfg: TicketsSettings): Promise<McpServerConfig | null> {
+export async function resolveServer(cfg: TicketsSettings): Promise<McpServerConfig | null> {
   const servers = await listMcpServers();
   if (cfg.server) return servers.find((s) => s.name === cfg.server) ?? null;
   return servers.find((s) => /ticket|arturito/i.test(s.name) || s.args.some((a) => /mcp-tickets/.test(a))) ?? null;

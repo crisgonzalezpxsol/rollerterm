@@ -1,12 +1,16 @@
 import { app, BrowserWindow, ipcMain, Menu, type MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
 import type { MenuCommand, Session } from "../shared/types";
+import { Assistant } from "./assistant";
+import { Bridge } from "./bridge";
 import { CalendarSync } from "./calendar";
 import { ClaudeRunner } from "./claude-runner";
 import { MailSync } from "./mail";
 import { NotesStore } from "./notes";
 import { listMcpServers } from "./mcp-client";
+import { resolveServer } from "./tickets";
 import { RailwayMonitor } from "./railway";
+import { Reminders } from "./reminders";
 import { TicketsMonitor } from "./tickets";
 import { listBrowsers, SettingsStore } from "./settings";
 import { PtyManager } from "./pty-manager";
@@ -59,6 +63,66 @@ ipcMain.on("prod:refresh", () => void prod.check());
 ipcMain.handle("prod:projects", () => prod.listProjects().catch(() => []));
 ipcMain.handle("settings:browsers", () => listBrowsers());
 ipcMain.on("settings:test-browser", () => settings.openUrl("https://calendar.google.com"));
+// ---------- asistente ----------
+
+const bridge = new Bridge();
+const assistant = new Assistant(claude, bridge, {
+  model: () => settings.current.assistant.model,
+  ticketServer: async () => (await resolveServer(settings.current.tickets))?.name ?? null,
+  emit: (event) => win?.webContents.send("chat:event", event),
+});
+const reminders = new Reminders((r) => {
+  win?.webContents.send("reminder:fire", r);
+  void assistant.addEvent(`⏰ Recordatorio: ${r.text}`);
+});
+
+bridge.on("crear_nota", async ({ texto }) => {
+  const now = Date.now();
+  const note = { id: crypto.randomUUID(), text: String(texto ?? ""), createdAt: now, updatedAt: now };
+  await notes.save(note);
+  win?.webContents.send("notes:changed");
+  return { ok: true, id: note.id };
+});
+bridge.on("buscar_notas", async ({ q }) => {
+  const needle = String(q ?? "").toLowerCase();
+  const all = await notes.list();
+  return (needle ? all.filter((n) => n.text.toLowerCase().includes(needle)) : all)
+    .slice(0, 30)
+    .map((n) => ({ texto: n.text, editada: new Date(n.updatedAt).toISOString() }));
+});
+bridge.on("crear_recordatorio", async ({ cuando, texto }) => {
+  const r = await reminders.add(String(cuando), String(texto ?? ""));
+  return { ok: true, id: r.id, cuando: new Date(r.when).toLocaleString("es-AR", { hourCycle: "h23" }) };
+});
+bridge.on("listar_recordatorios", async () =>
+  reminders.pending().map((r) => ({ id: r.id, cuando: new Date(r.when).toLocaleString("es-AR", { hourCycle: "h23" }), texto: r.text })),
+);
+bridge.on("borrar_recordatorio", async ({ id }) => ({ ok: await reminders.remove(String(id)) }));
+bridge.on("contexto_actual", async () => {
+  const cal = calendar.current;
+  const m = mail.current;
+  const t = tickets.current;
+  const p = prod.current;
+  return {
+    agenda: cal.events.map((e) => ({ titulo: e.title, inicio: e.start, fin: e.end, videollamada: Boolean(e.meetUrl), rechazado: e.declined })),
+    correo: {
+      importantes: m.vip,
+      hilos: m.threads.slice(0, 25).map((x) => ({ de: x.fromEmail, asunto: x.subject, fecha: x.date, sinLeer: x.unread, extracto: x.snippet })),
+    },
+    tickets: {
+      entorno: t.environment,
+      mios: t.tickets.filter((x) => x.mine).map((x) => ({ numero: x.numero, asunto: x.asunto, estado: x.estado, prioridad: x.prioridad, slaVencido: x.slaVencido })),
+      sinDueno: t.tickets.filter((x) => !x.atiende).map((x) => ({ numero: x.numero, asunto: x.asunto, prioridad: x.prioridad })),
+    },
+    produccion: p.services.filter((x) => x.health !== "ok").map((x) => ({ servicio: `${x.projectName} / ${x.serviceName}`, salud: x.health, estado: x.status })),
+  };
+});
+
+ipcMain.handle("chat:history", () => assistant.recent());
+ipcMain.handle("chat:send", (_e, text: string) => assistant.send(text));
+ipcMain.on("chat:stop", () => assistant.stop());
+ipcMain.on("chat:approve", (_e, id: string, approved: boolean) => assistant.approve(id, approved));
+
 ipcMain.handle("calendar:get", () => calendar.current);
 ipcMain.on("calendar:refresh", () => void calendar.sync());
 ipcMain.handle("mail:get", () => mail.current);
@@ -140,6 +204,10 @@ function buildMenu() {
       submenu: [{ label: "Mostrar / ocultar notas", accelerator: "CmdOrCtrl+Shift+N", click: () => send("toggle-notes") }],
     },
     {
+      label: "Asistente",
+      submenu: [{ label: "Mostrar / ocultar el chat", accelerator: "CmdOrCtrl+Shift+K", click: () => send("toggle-assistant") }],
+    },
+    {
       label: "Sonido",
       submenu: [{ label: "Silenciar / activar sonidos y avisos", accelerator: "CmdOrCtrl+Shift+M", click: () => send("toggle-mute") }],
     },
@@ -204,6 +272,9 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   await settings.load();
+  await bridge.start();
+  await assistant.start();
+  await reminders.start();
   // Sin empaquetar, macOS mostraría el ícono genérico de Electron en el Dock.
   app.dock?.setIcon(join(__dirname, "icon.png"));
   buildMenu();
