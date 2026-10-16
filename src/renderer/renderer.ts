@@ -109,7 +109,13 @@ function createTab(opts: { id?: string; name?: string; cwd?: string } = {}, focu
     cursorBlink: true,
     scrollback: 10000,
     macOptionIsMeta: true,
-    theme: { background: "#1e1e1e", foreground: "#d4d4d4" },
+    theme: {
+      background: "#13112b",
+      foreground: "#e0def4",
+      cursor: "#c4b5ff",
+      cursorAccent: "#13112b",
+      selectionBackground: "#7c5cff55",
+    },
   });
   const fit = new FitAddon();
   term.loadAddon(fit);

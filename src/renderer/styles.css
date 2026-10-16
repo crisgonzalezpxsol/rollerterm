@@ -1,12 +1,21 @@
 :root {
-  --bg: #1e1e1e;
-  --bar: #2b2b2b;
-  --tab: #333;
-  --tab-active: #1e1e1e;
-  --text: #ccc;
-  --text-muted: #888;
-  --accent: #0064c8;
-  --ended: #a05a5a;
+  /* Base índigo/violeta oscura. */
+  --bg: #13112b;
+  --bar: #1c1840;
+  --tab: #262153;
+  --tab-active: #13112b;
+  --input: #0d0b20;
+  --line: #2e2860;
+  --text: #dcd9f2;
+  --text-muted: #918cba;
+  --accent: #7c5cff;
+  --ended: #c27a8a;
+  /* Efecto RGB (como el botón de Pxsol IA): cian → violeta → rosa → naranja. */
+  --rgb: linear-gradient(90deg, #3ee8ff, #7c5cff, #ff3d9a, #ffa53d, #3ee8ff);
+  --rgb-fill: #241a5c;
+  --rgb-glow: 0 0 10px -2px #7c5cff99, -8px 0 20px -6px #3ee8ffcc, 8px 0 20px -6px #ff6a3dcc, 0 7px 20px -8px #ff3d9acc;
+  /* Paneles de arriba un tono más claro que la terminal, para separarlos. */
+  --panel: #19163d;
 }
 
 * { box-sizing: border-box; }
@@ -38,8 +47,8 @@ body { display: flex; flex-direction: column; }
 
 /* Mitad de arriba: agenda y correo. Mitad de abajo: terminales. */
 #top, #terminals { flex: 1 1 0; min-height: 0; }
-#top { display: flex; }
-#terminals { display: flex; flex-direction: column; border-top: 1px solid #000; }
+#top { display: flex; background: var(--panel); }
+#terminals { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
 
 #tabbar {
   display: flex;
@@ -74,7 +83,18 @@ body { display: flex; flex-direction: column; }
   cursor: default;
   flex-shrink: 0;
 }
-.tab.active { background: var(--tab-active); color: var(--text); box-shadow: inset 0 2px 0 var(--accent); }
+.tab.active { position: relative; background: var(--tab-active); color: var(--text); }
+/* Pestaña activa: una línea RGB arriba. */
+.tab.active::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  border-radius: 6px 6px 0 0;
+  background: var(--rgb);
+  background-size: 300% 100%;
+  animation: rgb-flow 8s linear infinite;
+}
 .tab.ended .label { color: var(--ended); font-style: italic; }
 .tab.drag-over { box-shadow: inset 2px 0 0 var(--accent); }
 
@@ -85,7 +105,7 @@ body { display: flex; flex-direction: column; }
   min-width: 0;
   font: inherit;
   color: var(--text);
-  background: #111;
+  background: var(--input);
   border: 1px solid var(--accent);
   border-radius: 3px;
   padding: 1px 4px;
@@ -183,9 +203,9 @@ body { display: flex; flex-direction: column; }
 /* ---------- paneles de arriba (agenda, correo) ---------- */
 .panel { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; padding: 10px 14px; overflow: hidden; }
 /* Columna izquierda: agenda arriba, tickets abajo. A la derecha, el correo. */
-#left { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid #000; }
+#left { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
 #left > .panel { min-height: 0; }
-#left > .panel + .panel { border-top: 1px solid #000; }
+#left > .panel + .panel { border-top: 1px solid var(--line); }
 #left > .panel[hidden] { display: none; }
 
 .panel-head { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -237,7 +257,7 @@ pre.detail {
   padding: 6px 8px;
   max-height: 160px;
   overflow: auto;
-  background: #111;
+  background: var(--input);
   border-radius: 4px;
   font: 11px Menlo, monospace;
   color: var(--text-muted);
@@ -302,7 +322,7 @@ pre.detail[hidden] { display: none; }
   min-width: 0;
   font: inherit;
   color: var(--text);
-  background: #111;
+  background: var(--input);
   border: 1px solid #ffffff26;
   border-radius: 3px;
   padding: 2px 6px;
@@ -371,7 +391,7 @@ pre.detail[hidden] { display: none; }
   box-shadow: 0 20px 60px #0009;
 }
 #settings::backdrop { background: #0008; }
-#settings header { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #0006; }
+#settings header { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line)6; }
 #settings h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .settings-close {
   margin-left: auto;
@@ -396,7 +416,7 @@ pre.detail[hidden] { display: none; }
   height: 26px;
   font: inherit;
   color: var(--text);
-  background: #111;
+  background: var(--input);
   border: 1px solid #ffffff26;
   border-radius: 4px;
   padding: 0 6px;
@@ -409,7 +429,7 @@ pre.detail[hidden] { display: none; }
 .browser-test:hover { filter: brightness(1.15); }
 .settings-saved { color: #5ab37a; }
 .settings-saved[hidden] { display: none; }
-#settings section + section { border-top: 1px solid #0006; }
+#settings section + section { border-top: 1px solid var(--line)6; }
 #settings label.check { justify-content: flex-start; gap: 8px; }
 #settings input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
 #settings input[type="range"] { flex: 1; max-width: 320px; accent-color: var(--accent); }
@@ -506,7 +526,7 @@ pre.detail[hidden] { display: none; }
 .tk-table-wrap { margin-top: 8px; overflow: auto; min-height: 0; }
 .tk-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .tk-table[hidden] { display: none; }
-.tk-table th { position: sticky; top: 0; background: var(--bg); text-align: left; font-weight: 600; color: var(--text-muted); font-size: 11px; padding: 4px 6px; border-bottom: 1px solid #ffffff1a; }
+.tk-table th { position: sticky; top: 0; background: var(--panel); text-align: left; font-weight: 600; color: var(--text-muted); font-size: 11px; padding: 4px 6px; border-bottom: 1px solid #ffffff1a; }
 .tk-table td { padding: 5px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid #ffffff0a; color: var(--text-muted); }
 .tk-table tbody tr { cursor: default; }
 .tk-table tbody tr:hover td { background: #ffffff0d; }
@@ -546,7 +566,7 @@ pre.detail[hidden] { display: none; }
   display: flex;
   flex-direction: column;
   background: var(--bar);
-  border-left: 1px solid #000;
+  border-left: 1px solid var(--line);
   box-shadow: -12px 0 40px #0008;
   transform: translateX(105%);
   transition: transform 0.18s ease;
@@ -555,7 +575,7 @@ pre.detail[hidden] { display: none; }
 #notes.open { transform: none; visibility: visible; }
 .notes-view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .notes-view[hidden] { display: none; }
-#notes header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #0006; flex-shrink: 0; }
+#notes header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line)6; flex-shrink: 0; }
 #notes h2 { margin: 0; font-size: 14px; font-weight: 600; }
 #notes header button {
   height: 24px;
@@ -592,3 +612,57 @@ pre.detail[hidden] { display: none; }
   font: 13px/1.55 -apple-system, BlinkMacSystemFont, sans-serif;
 }
 .notes-text::placeholder { color: #666; }
+
+/* ---------- efecto RGB ---------- */
+/* Línea RGB fina bajo la barra de título. */
+#titlebar { position: relative; }
+#titlebar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--rgb);
+  background-size: 300% 100%;
+  opacity: 0.7;
+  animation: rgb-flow 12s linear infinite;
+}
+
+/* Botones destacados: relleno violeta, borde en degradé y brillo alrededor. */
+.ev-join,
+.mail-summarize,
+.notes-new,
+.browser-test,
+.pomo-test,
+#pomodoro:not([data-phase="idle"]):not(.paused) > .pomo-display {
+  border: 2px solid transparent !important;
+  border-radius: 999px !important;
+  background:
+    linear-gradient(var(--rgb-fill), var(--rgb-fill)) padding-box,
+    var(--rgb) border-box !important;
+  background-size: 100% 100%, 300% 100% !important;
+  box-shadow: var(--rgb-glow);
+  color: #fff !important;
+  animation: rgb-flow 8s linear infinite;
+}
+.ev-join:hover,
+.mail-summarize:hover:not(:disabled),
+.notes-new:hover,
+.browser-test:hover,
+.pomo-test:hover,
+#pomodoro:not([data-phase="idle"]):not(.paused) > .pomo-display:hover {
+  filter: brightness(1.2);
+}
+.ev-join { padding: 0 12px; }
+.mail-summarize:disabled { opacity: 0.6; }
+#pomodoro:not([data-phase="idle"]):not(.paused) > .pomo-display { padding: 0 12px; }
+
+/* El degradé se desplaza despacio: el borde "corre" como un LED. */
+@keyframes rgb-flow { to { background-position: 0 0, 300% 0; } }
+.tab.active::before, #titlebar::after { animation-name: rgb-flow-single; }
+@keyframes rgb-flow-single { to { background-position: 300% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ev-join, .mail-summarize, .notes-new, .browser-test, .pomo-test, .tab.active::before, #titlebar::after,
+  #pomodoro > .pomo-display { animation: none !important; }
+}
