@@ -1,0 +1,131 @@
+import { app, BrowserWindow, ipcMain, Menu, shell, type MenuItemConstructorOptions } from "electron";
+import { join } from "node:path";
+import type { MenuCommand, Session } from "../shared/types";
+import { PtyManager } from "./pty-manager";
+import { loadSession, saveSession } from "./session-store";
+
+app.setName("tabterm");
+
+let win: BrowserWindow | null = null;
+
+const ptys = new PtyManager(
+  (id, data) => win?.webContents.send("pty:data", id, data),
+  (id, code) => win?.webContents.send("pty:exit", id, code),
+);
+
+ipcMain.handle("pty:create", (_e, id: string, cwd: string, cols: number, rows: number) => ptys.create(id, cwd, cols, rows));
+ipcMain.on("pty:write", (_e, id: string, data: string) => ptys.write(id, data));
+ipcMain.on("pty:resize", (_e, id: string, cols: number, rows: number) => ptys.resize(id, cols, rows));
+ipcMain.on("pty:kill", (_e, id: string) => ptys.kill(id));
+ipcMain.handle("pty:cwd", (_e, id: string) => ptys.getCwd(id));
+ipcMain.handle("session:load", () => loadSession());
+ipcMain.handle("session:save", (_e, session: Session) => {
+  lastSession = session;
+  return saveSession(session);
+});
+
+let lastSession: Session | null = null;
+
+/** Al cerrar, guarda en qué directorio quedó cada shell para reabrirla ahí. */
+async function saveWithCurrentCwds() {
+  if (!lastSession) return;
+  const tabs = await Promise.all(
+    lastSession.tabs.map(async (t) => ({ ...t, cwd: (await ptys.getCwd(t.id)) ?? t.cwd })),
+  );
+  await saveSession({ ...lastSession, tabs });
+}
+
+function send(cmd: MenuCommand) {
+  win?.webContents.send("menu", cmd);
+}
+
+function buildMenu() {
+  const gotoItems: MenuItemConstructorOptions[] = Array.from({ length: 9 }, (_, i) => ({
+    label: `Ir a la pestaña ${i + 1}`,
+    accelerator: `CmdOrCtrl+${i + 1}`,
+    click: () => send(`goto-tab:${i}`),
+  }));
+
+  const template: MenuItemConstructorOptions[] = [
+    { role: "appMenu" },
+    {
+      label: "Pestañas",
+      submenu: [
+        { label: "Nueva pestaña", accelerator: "CmdOrCtrl+T", click: () => send("new-tab") },
+        { label: "Renombrar pestaña", accelerator: "CmdOrCtrl+Shift+R", click: () => send("rename-tab") },
+        { label: "Cerrar pestaña", accelerator: "CmdOrCtrl+W", click: () => send("close-tab") },
+        { type: "separator" },
+        { label: "Pestaña siguiente", accelerator: "CmdOrCtrl+Shift+]", click: () => send("next-tab") },
+        { label: "Pestaña anterior", accelerator: "CmdOrCtrl+Shift+[", click: () => send("prev-tab") },
+        { type: "separator" },
+        ...gotoItems,
+      ],
+    },
+    { role: "editMenu" },
+    {
+      label: "Ver",
+      submenu: [
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { role: "resetZoom" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+        { role: "toggleDevTools" },
+      ],
+    },
+    { role: "windowMenu" },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function createWindow() {
+  win = new BrowserWindow({
+    width: 1100,
+    height: 700,
+    minWidth: 480,
+    minHeight: 300,
+    backgroundColor: "#1e1e1e",
+    titleBarStyle: "hiddenInset",
+    webPreferences: {
+      preload: join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  win.loadFile(join(__dirname, "index.html"));
+  // Los enlaces que se clickean en la terminal se abren en el navegador, nunca en la app.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//.test(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  win.webContents.on("will-navigate", (e) => e.preventDefault());
+  let saved = false;
+  win.on("close", (e) => {
+    if (saved) return;
+    e.preventDefault();
+    saveWithCurrentCwds()
+      .catch((err) => console.error("[saveWithCurrentCwds]", err))
+      .finally(() => {
+        saved = true;
+        win?.close();
+      });
+  });
+  win.on("closed", () => {
+    win = null;
+    ptys.killAll();
+  });
+}
+
+app.whenReady().then(() => {
+  buildMenu();
+  createWindow();
+  app.on("activate", () => {
+    if (!win) createWindow();
+  });
+});
+
+app.on("window-all-closed", () => {
+  ptys.killAll();
+  app.quit();
+});
