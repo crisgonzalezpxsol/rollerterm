@@ -4,25 +4,11 @@
 // Para que cada consulta sea barata se usa Haiku, sin herramientas propias de Claude
 // Code, y se bloquean todos los demás servidores MCP: si no, al usar una herramienta
 // MCP se cargan las definiciones de todos los conectores (cientos de miles de tokens).
-import { execFile } from "node:child_process";
 import { appendFile, stat, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { app } from "electron";
 import type { ConnectorStatus } from "../shared/types";
-
-// Variables que Claude Code pone en sus procesos hijos: si la app se lanzó desde una
-// sesión de Claude Code, el CLI creería que corre anidado.
-const INHERITED_CLAUDE_VARS = [
-  "CLAUDECODE",
-  "CLAUDE_PID",
-  "CLAUDE_CODE_ENTRYPOINT",
-  "CLAUDE_CODE_SESSION_ID",
-  "CLAUDE_CODE_CHILD_SESSION",
-  "CLAUDE_CODE_SESSION_ATTENDED",
-  "CLAUDE_CODE_MESSAGING_SOCKET",
-  "CLAUDE_CODE_MESSAGING_TOKEN",
-  "CLAUDE_CODE_EXECPATH",
-];
+import { exec, findCommand, type Command } from "./shell-env";
 
 interface StreamMessage {
   type?: string;
@@ -70,13 +56,13 @@ export interface QueryResult<T> {
 }
 
 export class ClaudeRunner {
-  private claude: { bin: string; env: NodeJS.ProcessEnv } | null = null;
+  private claude: Command | null = null;
   /** Nombres de todos los servidores MCP de la cuenta, para bloquear los que no se usan. */
   private servers: string[] | null = null;
   private probing: Promise<void> | null = null;
 
   async query<T>(opts: QueryOptions): Promise<QueryResult<T>> {
-    this.claude ??= await findClaude();
+    this.claude ??= await findCommand("claude");
     if (!this.claude) return { status: "no-claude", message: "No se encontró el comando `claude` (Claude Code)." };
     if (!this.servers) await (this.probing ??= this.probe().finally(() => (this.probing = null)));
 
@@ -214,44 +200,6 @@ function mcpPrefix(server: string): string {
 export function localIso(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-/**
- * Busca `claude` con el PATH de una shell interactiva: abierta desde el Finder, la app
- * no hereda el PATH de la terminal y ~/.local/bin suele agregarse en ~/.zshrc.
- */
-async function findClaude(): Promise<{ bin: string; env: NodeJS.ProcessEnv } | null> {
-  const env = { ...process.env };
-  for (const name of INHERITED_CLAUDE_VARS) delete env[name];
-  const shell = process.env.SHELL || "/bin/zsh";
-  const { stdout: out } = await exec(shell, ["-ilc", 'printf "__RT__%s__RT__%s__RT__" "$PATH" "$(command -v claude)"'], {
-    env,
-    timeoutMs: 15_000,
-  }).catch(() => ({ stdout: "" }));
-  const [, path, bin] = out.match(/__RT__(.*)__RT__(.*)__RT__/s) ?? [];
-  if (path) env.PATH = path;
-  return bin ? { bin, env } : null;
-}
-
-function exec(
-  bin: string,
-  args: string[],
-  opts: { env: NodeJS.ProcessEnv; cwd?: string; input?: string; timeoutMs: number },
-): Promise<{ stdout: string; stderr: string; exitError: string | null }> {
-  return new Promise((resolve, reject) => {
-    const child = execFile(
-      bin,
-      args,
-      { env: opts.env, cwd: opts.cwd, timeout: opts.timeoutMs, maxBuffer: 64 * 1024 * 1024 },
-      (err, stdout, stderr) => {
-        // Claude Code puede salir con código ≠ 0 y aun así haber escrito el resultado.
-        const exitError = err ? (err.killed ? `cortado por timeout (${opts.timeoutMs / 1000} s)` : err.message) : null;
-        if (err && !stdout) reject(new Error([exitError, stderr.trim()].filter(Boolean).join(" · ")));
-        else resolve({ stdout, stderr, exitError });
-      },
-    );
-    child.stdin?.end(opts.input ?? "");
-  });
 }
 
 function short(value: unknown, max: number): string {

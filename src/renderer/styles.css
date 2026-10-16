@@ -125,8 +125,7 @@ body { display: flex; flex-direction: column; }
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
-  padding-left: 12px;
+  padding-left: 6px;
   flex-shrink: 0;
   --pomo: var(--text-muted);
 }
@@ -391,3 +390,64 @@ pre.detail[hidden] { display: none; }
 .mt-new { flex-shrink: 0; align-self: center; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: #3ee8ff; color: #0b0b12; }
 .mail-new-count { white-space: nowrap; padding: 1px 7px; border-radius: 9px; background: #3ee8ff; color: #0b0b12; font-weight: 700; font-size: 11px; }
 .mail-new-count[hidden] { display: none; }
+
+/* ---------- producción (Railway) ---------- */
+#prod { -webkit-app-region: no-drag; position: relative; margin-left: auto; flex-shrink: 0; }
+#prod[hidden] { display: none; }
+#prod[hidden] ~ #pomodoro { margin-left: auto; }
+.prod-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.prod-badge:hover { background: #ffffff1a; color: var(--text); }
+.prod-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; }
+.prod-dot[data-health="ok"] { background: #5ab37a; }
+.prod-dot[data-health="deploying"], .prod-dot[data-health="degraded"] { background: #d9a441; }
+.prod-dot[data-health="down"] { background: #e0675a; box-shadow: 0 0 0 3px #e0675a40; animation: pulse 1.6s ease-in-out infinite; }
+.prod-dot[data-health="loading"] { background: #d9a441; opacity: 0.5; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px #e0675a00; } }
+
+.prod-pop {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  z-index: 20;
+  width: 360px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid #ffffff26;
+  border-radius: 8px;
+  background: var(--bar);
+  box-shadow: 0 12px 40px #0009;
+}
+.prod-pop[hidden] { display: none; }
+.prod-pop-head { display: flex; align-items: center; gap: 8px; }
+.prod-pop-head strong { color: var(--text); }
+.prod-when { color: var(--text-muted); }
+.prod-refresh { margin-left: auto; width: 22px; height: 22px; border: 0; border-radius: 4px; background: transparent; color: var(--text-muted); font-size: 14px; }
+.prod-refresh:hover:not(:disabled) { background: #ffffff1a; color: var(--text); }
+.prod-refresh.spinning { animation: spin 1s linear infinite; }
+.prod-summary { margin: 8px 0 6px; color: var(--text-muted); user-select: text; }
+.prod-list { list-style: none; margin: 0; padding: 0; }
+.prod-list li { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px 6px 10px; border-radius: 5px; border-left: 3px solid #d9a441; margin-bottom: 4px; background: #ffffff08; }
+.prod-list li:hover { background: #ffffff12; }
+.prod-list li[data-health="down"] { border-left-color: #e0675a; }
+.prod-list li strong { color: var(--text); font-weight: 600; }
+.prod-list li span { color: var(--text-muted); }
+.prod-config { margin-top: 6px; border: 0; background: transparent; color: var(--accent); font: inherit; padding: 2px 0; }
+.prod-config:hover { text-decoration: underline; }
+#settings .rw-projects { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin-top: 4px; }
+#settings .rw-projects[hidden] { display: none; }
+#settings .rw-projects .settings-help { grid-column: 1 / -1; }
+#settings { max-height: calc(100vh - 40px); overflow-y: auto; }
+#settings h3 + label { margin-top: 10px; }

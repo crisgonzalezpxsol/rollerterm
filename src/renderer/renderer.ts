@@ -7,6 +7,7 @@ import type { MenuCommand, Session, RollertermApi, Settings } from "../shared/ty
 import { mountAgenda } from "./agenda";
 import { mountMail } from "./mail";
 import { mountPomodoro } from "./pomodoro";
+import { mountProd } from "./prod";
 import { mountSettings } from "./settings";
 
 declare global {
@@ -48,6 +49,7 @@ const settingsPanel = mountSettings(api, {
   onChange: (s) => (settings = s),
 });
 document.getElementById("open-settings")!.addEventListener("click", () => void settingsPanel.open());
+mountProd(document.getElementById("prod") as HTMLElement, api, () => void settingsPanel.open());
 
 let tabs: Tab[] = [];
 let active: Tab | null = null;

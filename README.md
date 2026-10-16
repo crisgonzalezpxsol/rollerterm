@@ -10,7 +10,7 @@ App de escritorio (macOS) con dos mitades:
 - **Abajo, la terminal:** pestañas con nombre, una por ticket o por funcionalidad. Las pestañas,
   sus nombres y el directorio donde quedó cada una se recuerdan al cerrar y se restauran al abrir.
 
-Y un pomodoro en la barra de arriba.
+Y en la barra de arriba: un indicador de **producción en Railway** y un pomodoro.
 
 ## Instalación desde cero
 
@@ -25,6 +25,7 @@ Lleva unos 10 minutos. Se hace una sola vez.
 | Node.js 20 o más nuevo | `node -v` | Bajalo de [nodejs.org](https://nodejs.org) (versión LTS) o `brew install node` |
 | Claude Code | `claude --version` | `curl -fsSL https://claude.ai/install.sh \| bash` y abrí una terminal nueva |
 | Cuenta de Claude (Pro, Max, Team o Enterprise) | — | La agenda usa los conectores de claude.ai; una API key sola no alcanza. |
+| Railway CLI (opcional, para el indicador de producción) | `railway whoami` | `npm i -g @railway/cli` y después `railway login` |
 
 ### 2. Loguear Claude Code con tu cuenta de claude.ai
 
@@ -84,6 +85,7 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 | Marcar un remitente como importante / bloquearlo | pasá el mouse por el correo → `★` / `🚫` |
 | Editar direcciones importantes y bloqueadas | botón **Direcciones** (acepta direcciones o dominios enteros: `empresa.com`) |
 | Resumir lo de las importantes ahora | botón **Resumir** (últimas 24 h) |
+| Ver qué servicios de producción no están OK | clic en **Prod N/M** arriba a la derecha (clic en un servicio lo abre en Railway) |
 | Configuración | ⚙ arriba a la derecha · `⌘,` |
 | Pomodoro: iniciar / pausar | clic en 🍅 (arriba a la derecha) · `⌘⇧P` |
 | Pomodoro: reiniciar | `↺` junto al reloj · menú Pomodoro → Reiniciar |
@@ -126,6 +128,24 @@ prohibido explícitamente. Se usa el modelo Haiku y se bloquean los demás conec
 consulta sea liviana. Uso aproximado de tu plan: agenda ~US$0,005 cada 10 min, correo ~US$0,015
 por revisión, y cada resumen ~US$0,05.
 
+### Producción (Railway)
+
+El indicador **Prod N/M** de la barra de título muestra cuántos servicios del entorno
+`production` de tus proyectos de Railway están OK. El punto:
+
+- **verde:** todo OK (corriendo, o durmiendo en servicios serverless);
+- **ámbar:** algo se está desplegando, o el último deploy falló pero sigue corriendo la versión
+  anterior;
+- **rojo (titila):** algún servicio está **caído**: crasheado o sin ninguna versión corriendo.
+
+Un clic abre el detalle con lo que no está OK; un clic en un servicio lo abre en Railway. Se revisa
+cada 2 minutos y al despertar la Mac. Avisa con notificación cuando un servicio se cae y cuando se
+recupera (y, al abrir la app, si ya había alguno caído). En Configuración → Producción se elige
+qué proyectos vigilar o se apaga el indicador.
+
+Usa el CLI de Railway con tu sesión (`railway list` y `railway api`, solo lectura). No pasa por
+Claude: no gasta uso del plan.
+
 ### Configuración
 
 Con ⚙ o `⌘,`. Los cambios se guardan al instante en
@@ -136,6 +156,7 @@ Con ⚙ o `⌘,`. Los cambios se guardan al instante en
   (por ejemplo, el de la cuenta del trabajo, para que Meet y Gmail abran con esa cuenta). **Probar**
   abre Google Calendar con lo elegido.
 - **Pomodoro:** tictac sí/no, timbre sí/no y volumen.
+- **Producción (Railway):** mostrar u ocultar el indicador y qué proyectos vigilar.
 
 ### Pomodoro
 
@@ -162,6 +183,7 @@ el cartel, la app reintenta una vez sola: los conectores de claude.ai a veces tr
 | **Google Calendar / Gmail desconectado** | En una pestaña: `claude` → `/mcp` → **claude.ai Google Calendar** (o **Gmail**) **→ Authenticate**. Después `↻`. |
 | **Error al leer…** con "Not logged in" | La sesión de Claude Code expiró: corré `claude` en una pestaña, logueate y tocá `↻`. |
 | No llegan notificaciones | Configuración del Sistema → Notificaciones → rollerterm → permitir. Revisá también que no esté activo "No molestar". |
+| Indicador **Prod ?** | Pasá el mouse para ver el motivo. Casi siempre es el CLI: instalalo (`npm i -g @railway/cli`) o renová la sesión con `railway login`. |
 | En la barra de menú dice "Electron" en vez de "rollerterm" | Corré `npm run postinstall` (renombra el Electron que trae npm) y reabrí la app. |
 | **`posix_spawnp failed`** al abrir una pestaña | npm instala el `spawn-helper` de node-pty sin permiso de ejecución. Corré `npm run postinstall`. |
 | La terminal falla después de actualizar Electron | Hay que recompilar node-pty: `npm run postinstall`. |
@@ -173,7 +195,8 @@ Electron + [xterm.js](https://xtermjs.org) + [node-pty](https://github.com/micro
 
 ```
 src/main/       proceso principal: ventana, menú/atajos, una shell (pty) por pestaña, sesión,
-                agenda y correo vía Claude Code (claude-runner.ts, calendar.ts, mail.ts)
+                agenda y correo vía Claude Code (claude-runner.ts, calendar.ts, mail.ts),
+                producción vía Railway CLI (railway.ts), configuración (settings.ts)
 src/preload/    puente aislado: expone window.rollerterm a la ventana (sin Node en el renderer)
 src/renderer/   la ventana: agenda, correo, pomodoro, barra de pestañas y una terminal xterm por pestaña
 src/shared/     tipos compartidos (Session, CalendarState, MailState, MenuCommand, RollertermApi)

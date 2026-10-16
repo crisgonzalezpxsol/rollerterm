@@ -4,6 +4,7 @@ import type { MenuCommand, Session } from "../shared/types";
 import { CalendarSync } from "./calendar";
 import { ClaudeRunner } from "./claude-runner";
 import { MailSync } from "./mail";
+import { RailwayMonitor } from "./railway";
 import { listBrowsers, SettingsStore } from "./settings";
 import { PtyManager } from "./pty-manager";
 import { loadSession, saveSession } from "./session-store";
@@ -18,6 +19,10 @@ const ptys = new PtyManager(
 );
 
 const settings = new SettingsStore();
+const prod = new RailwayMonitor(
+  () => settings.current.railway,
+  (state) => win?.webContents.send("prod:state", state),
+);
 const claude = new ClaudeRunner();
 const calendar = new CalendarSync(claude, (state) => win?.webContents.send("calendar:state", state));
 const mail = new MailSync(
@@ -27,7 +32,15 @@ const mail = new MailSync(
 );
 
 ipcMain.handle("settings:get", () => settings.current);
-ipcMain.handle("settings:set", (_e, patch) => settings.update(patch));
+ipcMain.handle("settings:set", async (_e, patch) => {
+  const next = await settings.update(patch);
+  // Cambiar qué proyectos se vigilan se refleja en el indicador sin esperar al próximo ciclo.
+  if (patch.railway) void prod.check();
+  return next;
+});
+ipcMain.handle("prod:get", () => prod.current);
+ipcMain.on("prod:refresh", () => void prod.check());
+ipcMain.handle("prod:projects", () => prod.listProjects(true).catch(() => []));
 ipcMain.handle("settings:browsers", () => listBrowsers());
 ipcMain.on("settings:test-browser", () => settings.openUrl("https://calendar.google.com"));
 ipcMain.handle("calendar:get", () => calendar.current);
@@ -173,6 +186,7 @@ app.whenReady().then(async () => {
   createWindow();
   calendar.start();
   void mail.start();
+  prod.start();
   app.on("activate", () => {
     if (!win) createWindow();
   });

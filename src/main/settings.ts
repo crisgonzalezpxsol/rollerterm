@@ -10,6 +10,7 @@ import type { BrowserInfo, Settings } from "../shared/types";
 const DEFAULTS: Settings = {
   browser: { appPath: null, profile: null },
   pomodoro: { ticking: true, bell: true, volume: 0.6 },
+  railway: { enabled: true, projects: null },
 };
 
 /**
@@ -48,6 +49,7 @@ export class SettingsStore {
       this.settings = {
         browser: { ...DEFAULTS.browser, ...saved.browser },
         pomodoro: { ...DEFAULTS.pomodoro, ...saved.pomodoro },
+        railway: { ...DEFAULTS.railway, ...saved.railway },
       };
     } catch {
       // Primera vez o archivo corrupto: valores por defecto.

@@ -50,6 +50,10 @@ export interface RollertermApi {
   listBrowsers(): Promise<BrowserInfo[]>;
   /** Abre una página de prueba con el navegador configurado. */
   testBrowser(): void;
+  getProd(): Promise<ProdState>;
+  refreshProd(): void;
+  onProd(cb: (state: ProdState) => void): void;
+  listRailwayProjects(): Promise<RailwayProject[]>;
 }
 
 /** Un evento de Google Calendar tal como lo devuelve Claude Code. */
@@ -152,9 +156,16 @@ export interface PomodoroSound {
   volume: number;
 }
 
+export interface RailwaySettings {
+  enabled: boolean;
+  /** IDs de proyectos a vigilar; null = todos los que tengan entorno "production". */
+  projects: string[] | null;
+}
+
 export interface Settings {
   browser: BrowserChoice;
   pomodoro: PomodoroSound;
+  railway: RailwaySettings;
 }
 
 export interface BrowserInfo {
@@ -162,4 +173,39 @@ export interface BrowserInfo {
   appPath: string;
   /** Solo para navegadores con perfiles detectables (Chrome, Brave, Edge…). */
   profiles: { dir: string; label: string }[];
+}
+
+/** Salud de un servicio de producción en Railway. */
+export type ServiceHealth =
+  | "ok" //       corriendo (o durmiendo, en servicios serverless)
+  | "deploying" // construyendo o desplegando
+  | "degraded" //  el último deploy falló, pero sigue corriendo una versión anterior
+  | "down"; //     crasheado, o sin ninguna versión corriendo
+
+export interface ProdService {
+  projectId: string;
+  projectName: string;
+  environmentId: string;
+  serviceId: string;
+  serviceName: string;
+  health: ServiceHealth;
+  /** Estado crudo de Railway del último deploy (SUCCESS, FAILED, CRASHED, BUILDING…). */
+  status: string;
+  /** Cuándo se creó el último deploy (ISO). */
+  since: string | null;
+  url: string;
+}
+
+export interface ProdState {
+  /** "loading" | "ok": se pudo consultar; los demás explican por qué no. */
+  status: "loading" | "ok" | "disabled" | "no-cli" | "logged-out" | "error";
+  message: string | null;
+  checking: boolean;
+  lastCheck: number | null;
+  services: ProdService[];
+}
+
+export interface RailwayProject {
+  id: string;
+  name: string;
 }

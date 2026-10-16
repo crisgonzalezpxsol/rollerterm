@@ -1,5 +1,5 @@
 // Ventana de configuración (⚙ en la barra de título o ⌘,). Cada cambio se guarda al instante.
-import type { BrowserInfo, PomodoroSound, RollertermApi, Settings } from "../shared/types";
+import type { BrowserInfo, PomodoroSound, RailwayProject, RollertermApi, Settings } from "../shared/types";
 import { bell, tick } from "./sound";
 
 export interface SettingsPanel {
@@ -35,6 +35,12 @@ export function mountSettings(
       <div class="settings-actions">
         <button class="pomo-test">Probar sonido</button>
       </div>
+    </section>
+    <section>
+      <h3>Producción (Railway)</h3>
+      <p class="settings-help">Indicador en la barra de título con la salud del entorno «production». Usa el CLI de Railway con tu sesión.</p>
+      <label class="check"><input type="checkbox" class="rw-enabled" /> Mostrar el indicador de producción</label>
+      <div class="rw-projects"></div>
     </section>`;
   document.body.append(dialog);
 
@@ -46,6 +52,9 @@ export function mountSettings(
   const tickingBox = $<HTMLInputElement>(".pomo-ticking");
   const bellBox = $<HTMLInputElement>(".pomo-bell");
   const volumeRange = $<HTMLInputElement>(".pomo-volume");
+  const rwEnabled = $<HTMLInputElement>(".rw-enabled");
+  const rwProjects = $<HTMLDivElement>(".rw-projects");
+  let railwayProjects: RailwayProject[] = [];
 
   let browsers: BrowserInfo[] = [];
   let settings: Settings | null = null;
@@ -77,6 +86,31 @@ export function mountSettings(
     tickingBox.checked = settings.pomodoro.ticking;
     bellBox.checked = settings.pomodoro.bell;
     volumeRange.value = String(settings.pomodoro.volume);
+
+    rwEnabled.checked = settings.railway.enabled;
+    rwProjects.hidden = !settings.railway.enabled;
+    rwProjects.replaceChildren();
+    if (!railwayProjects.length) {
+      const empty = document.createElement("p");
+      empty.className = "settings-help";
+      empty.textContent = "No se encontraron proyectos (¿está instalado y logueado el CLI de Railway?).";
+      rwProjects.append(empty);
+    }
+    const watched = settings.railway.projects;
+    for (const p of railwayProjects) {
+      const label = document.createElement("label");
+      label.className = "check";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = !watched || watched.includes(p.id);
+      box.addEventListener("change", () => {
+        const ids = [...rwProjects.querySelectorAll<HTMLInputElement>("input")].flatMap((b, i) => (b.checked ? [railwayProjects[i].id] : []));
+        // Todos tildados = null: así un proyecto nuevo también se vigila.
+        void save({ railway: { enabled: true, projects: ids.length === railwayProjects.length ? null : ids } });
+      });
+      label.append(box, document.createTextNode(` ${p.name}`));
+      rwProjects.append(label);
+    }
   }
 
   async function save(patch: Partial<Settings>) {
@@ -113,6 +147,10 @@ export function mountSettings(
     setTimeout(() => bell(volume, 2), 2000);
   });
 
+  rwEnabled.addEventListener("change", () => {
+    void save({ railway: { enabled: rwEnabled.checked, projects: settings!.railway.projects } });
+  });
+
   $<HTMLButtonElement>(".settings-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", hooks.onClose);
   // Clic en el fondo oscuro cierra.
@@ -123,7 +161,11 @@ export function mountSettings(
   return {
     async open() {
       // Se vuelve a leer cada vez: pudo instalarse un navegador o crearse un perfil.
-      [settings, browsers] = await Promise.all([api.getSettings(), api.listBrowsers()]);
+      [settings, browsers, railwayProjects] = await Promise.all([
+        api.getSettings(),
+        api.listBrowsers(),
+        api.listRailwayProjects(),
+      ]);
       render();
       if (!dialog.open) dialog.showModal();
     },
