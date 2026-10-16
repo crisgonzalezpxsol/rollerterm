@@ -7,6 +7,7 @@ import type { MenuCommand, Session, RollertermApi, Settings } from "../shared/ty
 import { mountAgenda } from "./agenda";
 import { mountMail } from "./mail";
 import { mountNotes } from "./notes";
+import { setMuted } from "./notify";
 import { mountPomodoro } from "./pomodoro";
 import { mountProd } from "./prod";
 import { mountSettings } from "./settings";
@@ -39,7 +40,19 @@ const newTabBtn = document.getElementById("new-tab") as HTMLButtonElement;
 // Configuración local para lo que se lee a cada rato (sonido del pomodoro); se actualiza
 // al arrancar y con cada cambio en la ventana de configuración.
 let settings: Settings | null = null;
-api.getSettings().then((s) => (settings = s));
+const muteBtn = document.getElementById("toggle-mute") as HTMLButtonElement;
+function applySettings(s: Settings) {
+  settings = s;
+  setMuted(s.muted);
+  muteBtn.textContent = s.muted ? "🔕" : "🔔";
+  muteBtn.classList.toggle("on", s.muted);
+  muteBtn.title = s.muted ? "Silenciado: sin sonidos ni avisos. Clic para activar (⌘⇧M)" : "Silenciar sonidos y avisos (⌘⇧M)";
+}
+api.getSettings().then(applySettings);
+async function toggleMute() {
+  if (settings) applySettings(await api.setSettings({ muted: !settings.muted }));
+}
+muteBtn.addEventListener("click", () => void toggleMute());
 const pomodoro = mountPomodoro(
   document.getElementById("pomodoro") as HTMLDivElement,
   () => settings?.pomodoro ?? { ticking: true, bell: true, volume: 0.6 },
@@ -51,7 +64,7 @@ const notesPanel = mountNotes(api, () => active?.term.focus());
 document.getElementById("toggle-notes")!.addEventListener("click", () => notesPanel.toggle());
 const settingsPanel = mountSettings(api, {
   onClose: () => active?.term.focus(),
-  onChange: (s) => (settings = s),
+  onChange: applySettings,
 });
 document.getElementById("open-settings")!.addEventListener("click", () => void settingsPanel.open());
 mountProd(document.getElementById("prod") as HTMLElement, api, () => void settingsPanel.open("railway"));
@@ -256,6 +269,7 @@ api.onMenu((cmd: MenuCommand) => {
   // Con las notas abiertas, ⌘W las cierra en vez de cerrar la pestaña de la terminal.
   else if (cmd === "close-tab" && notesPanel.isOpen) notesPanel.close();
   else if (cmd === "toggle-notes") notesPanel.toggle();
+  else if (cmd === "toggle-mute") void toggleMute();
   else if (cmd === "close-tab" && active) closeTab(active);
   else if (cmd === "rename-tab" && active) startRename(active);
   else if (cmd === "next-tab" && tabs.length) activate(tabs[(idx + 1) % tabs.length]);

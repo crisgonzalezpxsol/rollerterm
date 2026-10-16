@@ -12,6 +12,7 @@ const DEFAULTS: Settings = {
   pomodoro: { ticking: true, bell: true, volume: 0.6 },
   railway: { enabled: true, projects: null },
   tickets: { enabled: true, server: null },
+  muted: false,
 };
 
 /**
@@ -52,6 +53,7 @@ export class SettingsStore {
         pomodoro: { ...DEFAULTS.pomodoro, ...saved.pomodoro },
         railway: { ...DEFAULTS.railway, ...saved.railway },
         tickets: { ...DEFAULTS.tickets, ...saved.tickets },
+        muted: saved.muted ?? DEFAULTS.muted,
       };
     } catch {
       // Primera vez o archivo corrupto: valores por defecto.

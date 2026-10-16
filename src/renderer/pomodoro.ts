@@ -1,7 +1,7 @@
 // Pomodoro en la barra de título: foco → descanso → gracia → foco…
 // La gracia es un minuto para acomodarse antes de volver a trabajar.
 import type { PomodoroSound } from "../shared/types";
-import { notify } from "./notify";
+import { isMuted, notify } from "./notify";
 import { bell, tick as tickSound } from "./sound";
 
 type Phase = "focus" | "break" | "grace";
@@ -58,7 +58,7 @@ export function mountPomodoro(root: HTMLElement, sound: () => PomodoroSound): Po
     if (running() && secs !== lastSecs) {
       lastSecs = secs;
       const { ticking, volume } = sound();
-      if (ticking) tickSound(secs % 2 === 0 ? "tic" : "tac", volume);
+      if (ticking && !isMuted()) tickSound(secs % 2 === 0 ? "tic" : "tac", volume);
     }
     const mmss = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
     display.textContent = `${running() ? "" : "⏸ "}${PHASES[phase].label} ${mmss}`;
@@ -74,7 +74,7 @@ export function mountPomodoro(root: HTMLElement, sound: () => PomodoroSound): Po
       if (endsAt <= Date.now()) endsAt = Date.now() + PHASES[phase].ms;
       notify("rollerterm · Pomodoro", PHASES[done].notice);
       const { bell: ring, volume } = sound();
-      if (ring) bell(volume, BELLS[phase].times, BELLS[phase].soft);
+      if (ring && !isMuted()) bell(volume, BELLS[phase].times, BELLS[phase].soft);
     }
     render();
   }

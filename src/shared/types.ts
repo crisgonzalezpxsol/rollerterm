@@ -22,6 +22,7 @@ export type MenuCommand =
   | "pomodoro-reset"
   | "open-settings"
   | "toggle-notes"
+  | "toggle-mute"
   | `goto-tab:${number}`;
 
 /** API que el preload expone a la ventana como `window.rollerterm`. */
@@ -176,6 +177,8 @@ export interface Settings {
   pomodoro: PomodoroSound;
   railway: RailwaySettings;
   tickets: TicketsSettings;
+  /** Silencio: sin sonidos ni notificaciones (todo lo demás sigue igual). */
+  muted: boolean;
 }
 
 export interface BrowserInfo {

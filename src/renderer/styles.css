@@ -319,7 +319,7 @@ pre.detail[hidden] { display: none; }
 .mt-actions button:hover { background: #ffffff1a; }
 
 /* ---------- configuración ---------- */
-#open-settings, #toggle-notes {
+#open-settings, #toggle-notes, #toggle-mute {
   -webkit-app-region: no-drag;
   width: 26px;
   height: 24px;
@@ -330,7 +330,8 @@ pre.detail[hidden] { display: none; }
   color: var(--text-muted);
   font-size: 15px;
 }
-#open-settings:hover, #toggle-notes:hover, #toggle-notes.on { background: #ffffff1a; color: var(--text); }
+#open-settings:hover, #toggle-notes:hover, #toggle-notes.on, #toggle-mute:hover { background: #ffffff1a; color: var(--text); }
+#toggle-mute.on { background: #e0675a33; }
 
 #settings {
   width: min(460px, calc(100vw - 32px));

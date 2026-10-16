@@ -139,6 +139,10 @@ function buildMenu() {
       label: "Notas",
       submenu: [{ label: "Mostrar / ocultar notas", accelerator: "CmdOrCtrl+Shift+N", click: () => send("toggle-notes") }],
     },
+    {
+      label: "Sonido",
+      submenu: [{ label: "Silenciar / activar sonidos y avisos", accelerator: "CmdOrCtrl+Shift+M", click: () => send("toggle-mute") }],
+    },
     { role: "editMenu" },
     {
       label: "Ver",

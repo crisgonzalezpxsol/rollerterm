@@ -91,6 +91,7 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 | Abrir un ticket | clic en la fila (se abre en Pxsol Agencias) |
 | Ver qué servicios de producción no están OK | clic en **Prod N/M** arriba a la derecha (clic en un servicio lo abre en Railway) |
 | Notas (abrir / cerrar el panel lateral) | 📝 arriba a la derecha · `⌘⇧N` · `Esc` o `⌘W` lo cierran |
+| Silenciar sonidos y avisos | 🔔/🔕 arriba a la derecha · `⌘⇧M` |
 | Configuración | ⚙ arriba a la derecha · `⌘,` |
 | Pomodoro: iniciar / pausar | clic en 🍅 (arriba a la derecha) · `⌘⇧P` |
 | Pomodoro: reiniciar | `↺` junto al reloj · menú Pomodoro → Reiniciar |
@@ -165,6 +166,12 @@ qué proyectos vigilar o se apaga el indicador.
 
 Usa el CLI de Railway con tu sesión (`railway list` y `railway api`, solo lectura). No pasa por
 Claude: no gasta uso del plan.
+
+### Silencio
+
+El botón 🔔 de la barra de título (o `⌘⇧M`) silencia la app de una: sin tictac ni timbre del
+pomodoro y sin ninguna notificación (llamadas, correos, tickets, producción). Todo lo demás
+sigue funcionando y a la vista. Se ve 🔕 mientras está silenciada y se recuerda al cerrar la app.
 
 ### Notas
 
