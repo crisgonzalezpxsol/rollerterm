@@ -6,9 +6,11 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { MenuCommand, Session, RollertermApi, Settings } from "../shared/types";
 import { mountAgenda } from "./agenda";
 import { mountAssistant } from "./assistant";
+import { mountTicketView } from "./ticket-view";
 import { mountMail } from "./mail";
 import { mountNotes } from "./notes";
 import { setMuted } from "./notify";
+import { baseName, mountPathPicker } from "./path-picker";
 import { mountPomodoro } from "./pomodoro";
 import { mountProd } from "./prod";
 import { mountSettings } from "./settings";
@@ -60,7 +62,8 @@ const pomodoro = mountPomodoro(
 );
 mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 mountMail(document.getElementById("mail") as HTMLElement, api);
-mountTickets(document.getElementById("tickets") as HTMLElement, api);
+const ticketView = mountTicketView(api, { onClose: () => active?.term.focus() });
+mountTickets(document.getElementById("tickets") as HTMLElement, api, (t) => ticketView.open(t));
 const notesPanel = mountNotes(api, () => active?.term.focus());
 // Un panel lateral a la vez: abrir el chat cierra las notas y al revés.
 const assistantPanel = mountAssistant(api, { onOpen: () => notesPanel.close(), onClose: () => active?.term.focus() });
@@ -76,6 +79,7 @@ const settingsPanel = mountSettings(api, {
 });
 document.getElementById("open-settings")!.addEventListener("click", () => void settingsPanel.open());
 mountProd(document.getElementById("prod") as HTMLElement, api, () => void settingsPanel.open("railway"));
+const pathPicker = mountPathPicker(api, { settings: () => settings, onChange: applySettings });
 
 let tabs: Tab[] = [];
 let active: Tab | null = null;
@@ -197,7 +201,7 @@ function closeTab(tab: Tab) {
   tabs.splice(idx, 1);
   if (tabs.length === 0) {
     active = null;
-    createTab();
+    createDefaultTab();
     return;
   }
   if (active === tab) activate(tabs[Math.min(idx, tabs.length - 1)]);
@@ -210,6 +214,88 @@ function setName(tab: Tab, name: string) {
   tab.tabEl.title = name;
   if (active === tab) document.title = name;
 }
+
+/** Pestaña nueva en la carpeta que se elija (rutas guardadas, recientes o el explorador). */
+async function newTab() {
+  const cwd = await pathPicker.pick();
+  if (cwd) createTab({ cwd, name: baseName(cwd) });
+  else active?.term.focus();
+}
+
+/** Sin preguntar: en la ruta por defecto (la primera guardada) o en el home. */
+function createDefaultTab() {
+  const cwd = pathPicker.defaultPath;
+  createTab(cwd ? { cwd, name: baseName(cwd) } : {});
+}
+
+// ---------- agrandar la terminal hacia arriba ----------
+
+const topEl = document.getElementById("top") as HTMLDivElement;
+const terminalsEl = document.getElementById("terminals") as HTMLElement;
+const splitter = document.getElementById("splitter") as HTMLDivElement;
+const maxBtn = document.getElementById("toggle-max") as HTMLButtonElement;
+const MIN_TERMINAL = 120;
+/** Fracción del alto que ocupan las terminales; 1 = paneles de arriba ocultos. */
+let terminalShare = 0.5;
+/** El tamaño de antes de agrandar, para restaurarlo. */
+let restoreShare = 0.5;
+try {
+  terminalShare = Number(localStorage.getItem("terminal-share")) || 0.5;
+  restoreShare = Number(localStorage.getItem("terminal-restore")) || 0.5;
+} catch {
+  // sin almacenamiento local: mitad y mitad
+}
+
+function applyShare(share: number) {
+  terminalShare = Math.min(1, Math.max(0.1, share));
+  const max = terminalShare >= 0.98;
+  topEl.hidden = max;
+  topEl.style.flex = `${1 - terminalShare} 1 0`;
+  terminalsEl.style.flex = `${terminalShare} 1 0`;
+  maxBtn.textContent = max ? "⤓" : "⤒";
+  maxBtn.title = max ? "Restaurar los paneles de arriba (⌘⇧Enter)" : "Agrandar la terminal hacia arriba (⌘⇧Enter)";
+  try {
+    localStorage.setItem("terminal-share", String(terminalShare));
+    localStorage.setItem("terminal-restore", String(restoreShare));
+  } catch {
+    // no importa si no se puede recordar
+  }
+}
+
+function toggleMax() {
+  if (terminalShare >= 0.98) applyShare(restoreShare >= 0.98 ? 0.5 : restoreShare);
+  else {
+    restoreShare = terminalShare;
+    applyShare(1);
+  }
+  active?.term.focus();
+}
+
+splitter.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  splitter.setPointerCapture(e.pointerId);
+  splitter.classList.add("dragging");
+  // Donde empieza la zona de paneles (debajo de la barra de título), aunque estén ocultos.
+  const area = document.getElementById("titlebar")!.getBoundingClientRect().bottom;
+  const onMove = (ev: PointerEvent) => {
+    const total = window.innerHeight - area;
+    const height = Math.max(MIN_TERMINAL, window.innerHeight - ev.clientY);
+    // Arrastrar casi hasta arriba es agrandar del todo.
+    applyShare(ev.clientY - area < 40 ? 1 : height / total);
+  };
+  const onUp = () => {
+    splitter.classList.remove("dragging");
+    splitter.removeEventListener("pointermove", onMove);
+    splitter.removeEventListener("pointerup", onUp);
+    if (terminalShare < 0.98) restoreShare = terminalShare;
+    applyShare(terminalShare);
+  };
+  splitter.addEventListener("pointermove", onMove);
+  splitter.addEventListener("pointerup", onUp);
+});
+splitter.addEventListener("dblclick", toggleMax);
+maxBtn.addEventListener("click", toggleMax);
+applyShare(terminalShare);
 
 // ---------- renombrar ----------
 
@@ -279,13 +365,14 @@ api.onExit((id, code) => {
 
 api.onMenu((cmd: MenuCommand) => {
   const idx = active ? tabs.indexOf(active) : -1;
-  if (cmd === "new-tab") createTab();
+  if (cmd === "new-tab") void newTab();
   // Con las notas abiertas, ⌘W las cierra en vez de cerrar la pestaña de la terminal.
   else if (cmd === "close-tab" && notesPanel.isOpen) notesPanel.close();
   else if (cmd === "close-tab" && assistantPanel.isOpen) assistantPanel.close();
   else if (cmd === "toggle-notes") toggleNotes();
   else if (cmd === "toggle-assistant") assistantPanel.toggle();
   else if (cmd === "toggle-mute") void toggleMute();
+  else if (cmd === "toggle-terminal-max") toggleMax();
   else if (cmd === "close-tab" && active) closeTab(active);
   else if (cmd === "rename-tab" && active) startRename(active);
   else if (cmd === "next-tab" && tabs.length) activate(tabs[(idx + 1) % tabs.length]);
@@ -301,9 +388,9 @@ api.onMenu((cmd: MenuCommand) => {
   }
 });
 
-newTabBtn.addEventListener("click", () => createTab());
+newTabBtn.addEventListener("click", () => void newTab());
 tabsEl.addEventListener("dblclick", (e) => {
-  if (e.target === tabsEl) createTab(); // doble clic en el hueco de la barra abre una pestaña
+  if (e.target === tabsEl) void newTab(); // doble clic en el hueco de la barra abre una pestaña
 });
 
 new ResizeObserver(() => active?.fit.fit()).observe(panesEl);
@@ -312,8 +399,10 @@ new ResizeObserver(() => active?.fit.fit()).observe(panesEl);
 
 async function boot() {
   const session = await api.loadSession().catch(() => null);
-  if (!session) {
-    createTab();
+  // La ruta por defecto sale de la configuración: esperarla antes de la primera pestaña.
+  if (!settings) applySettings(await api.getSettings());
+  if (!session?.tabs.length) {
+    createDefaultTab();
     return;
   }
   for (const t of session.tabs) createTab(t, false);

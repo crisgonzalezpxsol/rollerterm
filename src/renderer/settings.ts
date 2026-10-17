@@ -50,7 +50,7 @@ export function mountSettings(
     </section>
     <section data-section="tickets">
       <h3>Tickets (Pxsol Agencias)</h3>
-      <p class="settings-help">Tabla debajo de la agenda. Usa el MCP de tickets que tengas configurado en Claude Code, solo para leer.</p>
+      <p class="settings-help">Tabla debajo de la agenda. Usa el MCP de tickets que tengas configurado en Claude Code. Clic en un ticket para verlo completo, comentarlo y cambiarle el estado o el dueño.</p>
       <label class="check"><input type="checkbox" class="tk-enabled" /> Mostrar el panel de tickets</label>
       <label class="tk-server-row">Servidor MCP <select class="tk-server"></select></label>
     </section>

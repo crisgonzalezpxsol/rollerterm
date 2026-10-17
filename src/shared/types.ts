@@ -24,6 +24,7 @@ export type MenuCommand =
   | "toggle-notes"
   | "toggle-mute"
   | "toggle-assistant"
+  | "toggle-terminal-max"
   | `goto-tab:${number}`;
 
 /** API que el preload expone a la ventana como `window.rollerterm`. */
@@ -33,6 +34,8 @@ export interface RollertermApi {
   resize(id: string, cols: number, rows: number): void;
   kill(id: string): void;
   getCwd(id: string): Promise<string | null>;
+  /** Selector nativo de carpetas; null si se cancela. */
+  pickFolder(defaultPath?: string): Promise<string | null>;
   loadSession(): Promise<Session | null>;
   saveSession(session: Session): Promise<void>;
   onData(cb: (id: string, data: string) => void): void;
@@ -59,6 +62,10 @@ export interface RollertermApi {
   listRailwayProjects(): Promise<RailwayProject[]>;
   getTickets(): Promise<TicketsState>;
   refreshTickets(): void;
+  /** El hilo completo de un ticket. */
+  viewTicket(numero: number): Promise<TicketView>;
+  /** Comenta, cambia el estado o el dueño; devuelve el ticket ya actualizado. */
+  ticketAction(numero: number, action: TicketAction): Promise<TicketView>;
   onTickets(cb: (state: TicketsState) => void): void;
   /** Servidores MCP por stdio configurados en Claude Code (para elegir el de tickets). */
   listMcpServers(): Promise<string[]>;
@@ -189,7 +196,18 @@ export interface Settings {
   tickets: TicketsSettings;
   /** Silencio: sin sonidos ni notificaciones (todo lo demás sigue igual). */
   muted: boolean;
+  /** El asistente lee sus respuestas en voz alta. */
+  speak: boolean;
   assistant: AssistantSettings;
+  terminal: TerminalSettings;
+}
+
+/** Carpetas para abrir pestañas nuevas. */
+export interface TerminalSettings {
+  /** Rutas guardadas; la primera es la de por defecto. */
+  paths: string[];
+  /** Últimas carpetas elegidas, la más nueva primero. */
+  recent: string[];
 }
 
 export interface BrowserInfo {
@@ -268,6 +286,42 @@ export interface TicketsState {
   /** "producción" o el subdominio ("testing"), para que se note contra qué entorno se mira. */
   environment: string | null;
 }
+
+/** El hilo completo de un ticket (`ver_ticket`). */
+export interface TicketDetail {
+  numero: number;
+  numeroEnNexus: number | null;
+  asunto: string;
+  descripcion: string | null;
+  estado: TicketStatus;
+  prioridad: TicketPriority;
+  categoria: string | null;
+  tipo: string | null;
+  agencia: string | null;
+  abiertoPor: string | null;
+  atiende: string | null;
+  atiendeEmail: string | null;
+  /** ISO. */
+  creadoEl: string;
+  venceEl: string | null;
+  slaVencido: boolean;
+  comentarios: { rol: string; autor: string; cuando: string; texto: string }[];
+  /** La forma exacta depende del servidor: se muestra lo que traiga (nombre y link). */
+  adjuntos: Record<string, unknown>[];
+  diagnostico: { pantalla?: string; erroresDeConsola?: unknown[]; llamadasFallidas?: unknown[] } | null;
+}
+
+/** Lo que el panel de detalle necesita además del ticket: tu correo y la web. */
+export interface TicketView {
+  ticket: TicketDetail;
+  me: string | null;
+  webUrl: string | null;
+}
+
+export type TicketAction =
+  | { type: "comment"; texto: string }
+  | { type: "status"; estado: TicketStatus }
+  | { type: "assign"; email: string | null };
 
 export interface TicketsSettings {
   enabled: boolean;

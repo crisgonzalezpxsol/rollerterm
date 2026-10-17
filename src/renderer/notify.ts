@@ -3,6 +3,7 @@ let muted = false;
 export const isMuted = () => muted;
 export function setMuted(value: boolean): void {
   muted = value;
+  if (muted) speechSynthesis.cancel(); // también calla al asistente si estaba leyendo
 }
 
 /** Notificación del sistema; el clic trae la ventana al frente o hace lo que se indique. */

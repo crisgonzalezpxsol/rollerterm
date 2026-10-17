@@ -2,7 +2,8 @@
 // historial por día, la respuesta mientras llega, qué herramientas usa y las aprobaciones.
 import type { ApprovalRequest, ChatMessage, ChatStreamEvent, RollertermApi } from "../shared/types";
 import { renderMarkdown } from "./markdown";
-import { notify } from "./notify";
+import { isMuted, notify } from "./notify";
+import { speak, stopSpeaking } from "./speech";
 
 export interface AssistantPanel {
   toggle(): void;
@@ -29,6 +30,7 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
         <h2>Asistente</h2>
         <small>Contale tu jornada · recuerda, anota, busca y te pregunta antes de enviar</small>
       </div>
+      <button class="as-voice" title="Leer las respuestas en voz alta">🔈</button>
       <button class="as-close" title="Cerrar (Esc)">×</button>
     </header>
     <div class="as-log"></div>
@@ -42,6 +44,7 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
   const form = aside.querySelector(".as-composer") as HTMLFormElement;
   const input = aside.querySelector("textarea") as HTMLTextAreaElement;
   const sendBtn = aside.querySelector(".as-send") as HTMLButtonElement;
+  const voiceBtn = aside.querySelector(".as-voice") as HTMLButtonElement;
 
   let open = false;
   let loaded = false;
@@ -50,6 +53,43 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
   /** La respuesta que está llegando: su burbuja, el texto acumulado y las herramientas. */
   let live: { id: string; el: HTMLDivElement; body: HTMLDivElement; tools: HTMLDivElement; text: string } | null = null;
   const approvalCards = new Map<string, HTMLDivElement>();
+
+  // ---------- voz ----------
+
+  let voiceOn = false;
+  /** El botón ▶ de la burbuja que se está leyendo, para volverlo a ▶ al terminar. */
+  let playing: HTMLButtonElement | null = null;
+  function renderVoice() {
+    voiceBtn.textContent = voiceOn ? "🔊" : "🔈";
+    voiceBtn.classList.toggle("on", voiceOn);
+    voiceBtn.title = voiceOn ? "Leyendo las respuestas en voz alta. Clic para dejar de leer" : "Leer las respuestas en voz alta";
+  }
+  void api.getSettings().then((s) => {
+    voiceOn = s.speak;
+    renderVoice();
+  });
+  voiceBtn.addEventListener("click", async () => {
+    voiceOn = !voiceOn;
+    renderVoice();
+    if (!voiceOn) quiet();
+    voiceOn = (await api.setSettings({ speak: voiceOn })).speak;
+  });
+  function quiet() {
+    stopSpeaking();
+    if (playing) playing.textContent = "▶";
+    playing = null;
+  }
+  function read(text: string, btn: HTMLButtonElement | null) {
+    quiet();
+    if (btn) {
+      btn.textContent = "■";
+      playing = btn;
+    }
+    speak(text, () => {
+      if (playing === btn && btn) btn.textContent = "▶";
+      if (playing === btn) playing = null;
+    });
+  }
 
   // ---------- pintar ----------
 
@@ -82,6 +122,14 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     const meta = document.createElement("span");
     meta.className = "as-time";
     meta.textContent = time(m.at);
+    if (m.role === "assistant" && m.text) {
+      const play = document.createElement("button");
+      play.className = "as-play";
+      play.textContent = "▶";
+      play.title = "Escuchar";
+      play.addEventListener("click", () => (playing === play ? quiet() : read(m.text, play)));
+      meta.prepend(play);
+    }
     el.append(meta);
     log.append(el);
     return el;
@@ -179,7 +227,8 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     } else if (e.type === "done") {
       live?.el.remove();
       live = null;
-      bubble(e.message);
+      const done = bubble(e.message);
+      if (voiceOn && !isMuted() && !e.message.error) read(e.message.text, done.querySelector(".as-play"));
       setBusy(false);
       scrollDown(true);
       if (!open) notify("💬 Respondió el asistente", e.message.text.slice(0, 120), () => panel.toggle());
@@ -198,6 +247,7 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     if (!text || busy) return;
     input.value = "";
     autosize();
+    quiet();
     bubble({ id: "", role: "user", text, at: Date.now() });
     scrollDown(true);
     setBusy(true);
@@ -227,6 +277,15 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     }
   });
   aside.querySelector(".as-close")!.addEventListener("click", () => panel.close());
+  // Clic afuera del panel lo cierra (menos el botón 💬, que ya lo alterna).
+  document.addEventListener(
+    "mousedown",
+    (e) => {
+      const target = e.target as Node;
+      if (open && !aside.contains(target) && !document.getElementById("toggle-assistant")?.contains(target)) panel.close();
+    },
+    true,
+  );
   aside.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       e.preventDefault();

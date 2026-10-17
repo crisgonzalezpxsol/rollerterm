@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, Menu, type MenuItemConstructorOptions } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions } from "electron";
 import { join } from "node:path";
-import type { MenuCommand, Session } from "../shared/types";
+import type { MenuCommand, Session, TicketAction } from "../shared/types";
 import { Assistant } from "./assistant";
 import { Bridge } from "./bridge";
 import { CalendarSync } from "./calendar";
@@ -56,6 +56,8 @@ ipcMain.handle("notes:save", (_e, note) => notes.save(note));
 ipcMain.handle("notes:delete", (_e, id: string) => notes.delete(id));
 ipcMain.handle("tickets:get", () => tickets.current);
 ipcMain.on("tickets:refresh", () => void tickets.check());
+ipcMain.handle("tickets:view", (_e, numero: number) => tickets.view(numero));
+ipcMain.handle("tickets:action", (_e, numero: number, action: TicketAction) => tickets.view(numero, action));
 ipcMain.handle("tickets:servers", async () => (await listMcpServers()).map((s) => s.name));
 ipcMain.handle("prod:get", () => prod.current);
 ipcMain.on("prod:refresh", () => void prod.check());
@@ -134,6 +136,11 @@ ipcMain.on("pty:write", (_e, id: string, data: string) => ptys.write(id, data));
 ipcMain.on("pty:resize", (_e, id: string, cols: number, rows: number) => ptys.resize(id, cols, rows));
 ipcMain.on("pty:kill", (_e, id: string) => ptys.kill(id));
 ipcMain.handle("pty:cwd", (_e, id: string) => ptys.getCwd(id));
+ipcMain.handle("dialog:folder", async (_e, defaultPath?: string) => {
+  const opts = { title: "Abrir terminal en…", buttonLabel: "Abrir acá", defaultPath, properties: ["openDirectory", "createDirectory"] as ("openDirectory" | "createDirectory")[] };
+  const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
+  return r.canceled ? null : (r.filePaths[0] ?? null);
+});
 ipcMain.handle("session:load", () => loadSession());
 ipcMain.handle("session:save", (_e, session: Session) => {
   lastSession = session;
@@ -182,12 +189,14 @@ function buildMenu() {
     {
       label: "Pestañas",
       submenu: [
-        { label: "Nueva pestaña", accelerator: "CmdOrCtrl+T", click: () => send("new-tab") },
+        { label: "Nueva pestaña…", accelerator: "CmdOrCtrl+T", click: () => send("new-tab") },
         { label: "Renombrar pestaña", accelerator: "CmdOrCtrl+Shift+R", click: () => send("rename-tab") },
         { label: "Cerrar pestaña", accelerator: "CmdOrCtrl+W", click: () => send("close-tab") },
         { type: "separator" },
         { label: "Pestaña siguiente", accelerator: "CmdOrCtrl+Shift+]", click: () => send("next-tab") },
         { label: "Pestaña anterior", accelerator: "CmdOrCtrl+Shift+[", click: () => send("prev-tab") },
+        { type: "separator" },
+        { label: "Agrandar / restaurar la terminal", accelerator: "CmdOrCtrl+Shift+Enter", click: () => send("toggle-terminal-max") },
         { type: "separator" },
         ...gotoItems,
       ],

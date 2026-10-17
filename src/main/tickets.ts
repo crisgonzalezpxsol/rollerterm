@@ -1,7 +1,8 @@
-// Tickets de Pxsol Agencias: se leen con el MCP de tickets que ya usa Claude Code
-// (listar_tickets, solo lectura), lanzándolo directo. No pasa por Claude.
+// Tickets de Pxsol Agencias: se leen y se gestionan con el MCP de tickets que ya usa Claude
+// Code, lanzándolo directo (no pasa por Claude). La lista se refresca sola; el detalle, los
+// comentarios y los cambios de estado o dueño se piden al abrir un ticket.
 import { powerMonitor } from "electron";
-import type { Ticket, TicketsSettings, TicketsState, TicketStatus } from "../shared/types";
+import type { Ticket, TicketAction, TicketDetail, TicketsSettings, TicketsState, TicketStatus, TicketView } from "../shared/types";
 import { listMcpServers, withMcp, type McpServerConfig } from "./mcp-client";
 
 const CHECK_EVERY_MS = 3 * 60_000;
@@ -113,6 +114,26 @@ export class TicketsMonitor {
     } finally {
       this.update({ checking: false });
     }
+  }
+
+  /** El hilo completo de un ticket, y si viene `action`, la aplica antes de leerlo. */
+  async view(numero: number, action?: TicketAction): Promise<TicketView> {
+    const server = await resolveServer(this.settings());
+    if (!server) throw new Error("No se encontró el servidor MCP de tickets.");
+    const ticket = String(numero);
+    const detail = await withMcp(server, async (call) => {
+      if (action?.type === "comment") await call("comentar_ticket", { ticket, texto: action.texto });
+      else if (action?.type === "status") await call("cambiar_estado", { ticket, estado: action.estado });
+      else if (action?.type === "assign") await call("asignar_ticket", { ticket, assigneeEmail: action.email });
+      return (await call("ver_ticket", { ticket })) as TicketDetail;
+    });
+    // Que la tabla refleje el cambio (estado, dueño, cantidad de comentarios) sin esperar al ciclo.
+    if (action) void this.check();
+    return {
+      ticket: { ...detail, comentarios: detail.comentarios ?? [], adjuntos: detail.adjuntos ?? [] },
+      me: server.env.TICKETS_ACTOR_EMAIL || null,
+      webUrl: server.env.AGENCIAS_WEB_URL?.replace(/\/$/, "") || null,
+    };
   }
 
   private update(patch: Partial<TicketsState>): void {

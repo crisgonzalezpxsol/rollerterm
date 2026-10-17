@@ -13,7 +13,9 @@ const DEFAULTS: Settings = {
   railway: { enabled: true, projects: null },
   tickets: { enabled: true, server: null },
   muted: false,
+  speak: false,
   assistant: { model: "sonnet" },
+  terminal: { paths: [], recent: [] },
 };
 
 /**
@@ -55,7 +57,9 @@ export class SettingsStore {
         railway: { ...DEFAULTS.railway, ...saved.railway },
         tickets: { ...DEFAULTS.tickets, ...saved.tickets },
         muted: saved.muted ?? DEFAULTS.muted,
+        speak: saved.speak ?? DEFAULTS.speak,
         assistant: { ...DEFAULTS.assistant, ...saved.assistant },
+        terminal: { ...DEFAULTS.terminal, ...saved.terminal },
       };
     } catch {
       // Primera vez o archivo corrupto: valores por defecto.

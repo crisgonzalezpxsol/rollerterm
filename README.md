@@ -87,7 +87,8 @@ notas y configuración se comparten.
 
 | Acción | Cómo |
 | --- | --- |
-| Nueva pestaña | `⌘T` · botón `+` · doble clic en el hueco de la barra de pestañas |
+| Nueva pestaña | `⌘T` · botón `+` · doble clic en el hueco de la barra de pestañas — pregunta en qué carpeta: rutas guardadas (★), recientes u «Otra carpeta…» (explorador, `⌘O`). Sin ninguna, abre directo el explorador. La primera ruta guardada es la **por defecto** (⌂ cambia cuál) |
+| Agrandar la terminal hacia arriba | arrastrar el divisor de arriba de las pestañas · doble clic en el divisor · `⤒` · `⌘⇧Enter` |
 | Renombrar | doble clic en el nombre · `⌘⇧R` (Enter guarda, Esc cancela) |
 | Cerrar | `⌘W` · `×` · clic con la rueda |
 | Cambiar de pestaña | `⌘1`…`⌘8`, `⌘9` = la última · `⌘⇧]` / `⌘⇧[` |
@@ -99,7 +100,7 @@ notas y configuración se comparten.
 | Marcar un remitente como importante / bloquearlo | pasá el mouse por el correo → `★` / `🚫` |
 | Editar direcciones importantes y bloqueadas | botón **Direcciones** (acepta direcciones o dominios enteros: `empresa.com`) |
 | Resumir lo de las importantes ahora | botón **Resumir** (últimas 24 h) |
-| Abrir un ticket | clic en la fila (se abre en Pxsol Agencias) |
+| Abrir un ticket | clic en la fila (vista completa: comentar, cambiar estado, asignarte) |
 | Ver qué servicios de producción no están OK | clic en **Prod N/M** arriba a la derecha (clic en un servicio lo abre en Railway) |
 | Asistente (abrir / cerrar el chat) | 💬 arriba a la derecha · `⌘⇧K` · `Esc` o `⌘W` lo cierran |
 | Notas (abrir / cerrar el panel lateral) | 📝 arriba a la derecha · `⌘⇧N` · `Esc` o `⌘W` lo cierran |
@@ -150,15 +151,23 @@ por revisión, y cada resumen ~US$0,05.
 
 Tabla debajo de la agenda con los tickets sin cerrar, en tres pestañas: **Míos**, **Sin dueño**
 y **Abiertos** (con la cantidad de cada una). Van primero los de SLA vencido, después por
-prioridad y después los más nuevos. Un clic abre el ticket en la web de Agencias.
+prioridad y después los más nuevos. Un clic abre la **vista completa** del ticket: descripción,
+todos los comentarios, adjuntos y el diagnóstico del navegador. Desde ahí se **comenta** (la agencia
+lo ve y sale a tu nombre; ⌘Enter envía), se **cambia el estado** (cerrar pide confirmación), se
+**toma o suelta** con Asignarme / Soltar, y «Web ↗» lo abre en Agencias. Clic afuera o Esc cierra.
+
+El buscador del encabezado filtra por **número de ticket** (con o sin `#`), asunto, agencia o quién
+lo atiende, en todos los abiertos. Enter con un número abre ese ticket aunque no esté en la lista
+(por ejemplo, uno cerrado); Esc limpia la búsqueda.
 
 - Se revisa cada 3 minutos y al despertar la Mac.
 - Avisa cuando te asignan un ticket nuevo y cuando a uno tuyo se le vence el SLA.
 - La etiqueta junto al título muestra contra qué entorno se mira (**TESTING** o **PRODUCCIÓN**),
   según el `AGENCIAS_WEB_URL` del servidor MCP.
 - Usa el **MCP de tickets** de pxsol-agencias tal como está configurado en Claude Code
-  (`~/.claude.json`), lanzándolo directo y solo con `listar_tickets`: no pasa por Claude ni
-  escribe nada. En Configuración → Tickets se elige el servidor (por defecto, el primero que
+  (`~/.claude.json`), lanzándolo directo: la tabla usa `listar_tickets` y la vista completa
+  `ver_ticket`, `comentar_ticket`, `cambiar_estado` y `asignar_ticket`. No pasa por Claude.
+  En Configuración → Tickets se elige el servidor (por defecto, el primero que
   parezca de tickets) o se oculta el panel.
 
 ### Producción (Railway)

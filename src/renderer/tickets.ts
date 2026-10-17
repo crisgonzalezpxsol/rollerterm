@@ -30,7 +30,7 @@ function byUrgency(a: Ticket, b: Ticket): number {
   );
 }
 
-export function mountTickets(root: HTMLElement, api: RollertermApi): void {
+export function mountTickets(root: HTMLElement, api: RollertermApi, openTicket: (t: Pick<Ticket, "numero" | "asunto">) => void): void {
   root.classList.add("panel");
   root.innerHTML = `
     <div class="panel-head">
@@ -38,12 +38,14 @@ export function mountTickets(root: HTMLElement, api: RollertermApi): void {
       <span class="tk-env" hidden></span>
       <span class="panel-status"></span>
       <div class="panel-actions">
+        <input class="tk-search" type="search" placeholder="Buscar # o texto" title="Filtrá por número de ticket, asunto o agencia. Enter abre el ticket con ese número (aunque no esté en la lista)." spellcheck="false" />
         <div class="tk-tabs"></div>
         <button class="panel-refresh" title="Actualizar ahora">↻</button>
       </div>
     </div>
     <div class="panel-alert" hidden></div>
     <p class="tk-note" hidden></p>
+    <button class="panel-btn tk-open-num" hidden></button>
     <div class="tk-table-wrap">
       <table class="tk-table">
         <thead><tr><th>#</th><th>Asunto</th><th>Estado</th><th>Prioridad</th><th>Agencia</th><th>Atiende</th><th>Creado</th></tr></thead>
@@ -61,6 +63,8 @@ export function mountTickets(root: HTMLElement, api: RollertermApi): void {
   const tbody = $<HTMLTableSectionElement>("tbody");
   const table = $<HTMLTableElement>(".tk-table");
   const emptyEl = $<HTMLParagraphElement>(".panel-empty");
+  const searchEl = $<HTMLInputElement>(".tk-search");
+  const openNumBtn = $<HTMLButtonElement>(".tk-open-num");
 
   let state: TicketsState | null = null;
   let tab: Tab = "mine";
@@ -73,6 +77,47 @@ export function mountTickets(root: HTMLElement, api: RollertermApi): void {
   let known: { mine: Set<number>; sla: Set<number> } | null = null;
 
   refreshBtn.addEventListener("click", () => api.refreshTickets());
+
+  // Búsqueda: busca en todos los abiertos (no solo en la pestaña). Un número que no está en la
+  // lista (por ejemplo, uno cerrado) se puede abrir igual con Enter o con el botón.
+  const query = () => searchEl.value.trim().toLowerCase();
+  const queryNumber = () => {
+    const m = /^#?(\d+)$/.exec(query());
+    return m ? Number(m[1]) : null;
+  };
+  function matches(t: Ticket, q: string): boolean {
+    const num = q.replace(/^#/, "");
+    if (/^\d+$/.test(num)) return String(t.numero).includes(num) || String(t.numeroEnNexus ?? "").includes(num);
+    return [t.asunto, t.agencia ?? "", t.atiende ?? ""].some((x) => x.toLowerCase().includes(q));
+  }
+  function openByNumber(n: number) {
+    open(state?.tickets.find((t) => t.numero === n) ?? { numero: n, asunto: "" });
+  }
+  searchEl.addEventListener("input", render);
+  searchEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const n = queryNumber();
+      const rows = currentRows();
+      if (n !== null) openByNumber(n);
+      else if (rows.length === 1) open(rows[0]);
+    } else if (e.key === "Escape" && searchEl.value) {
+      searchEl.value = "";
+      render();
+    } else return;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  openNumBtn.addEventListener("click", () => {
+    const n = queryNumber();
+    if (n !== null) openByNumber(n);
+  });
+
+  function currentRows(): Ticket[] {
+    if (!state) return [];
+    const q = query();
+    const filter = q ? (t: Ticket) => matches(t, q) : TABS.find((t) => t.id === tab)!.filter;
+    return state.tickets.filter(filter).sort(byUrgency);
+  }
 
   function checkNews(s: TicketsState) {
     if (s.status !== "ok" || s.checking) return;
@@ -90,9 +135,7 @@ export function mountTickets(root: HTMLElement, api: RollertermApi): void {
     known = { mine, sla };
   }
 
-  function open(t: Ticket) {
-    if (state?.webUrl) window.open(`${state.webUrl}/tickets?q=${t.numero}`);
-  }
+  const open = (t: Pick<Ticket, "numero" | "asunto">) => openTicket(t);
 
   function render() {
     if (!state) return;
@@ -135,6 +178,7 @@ export function mountTickets(root: HTMLElement, api: RollertermApi): void {
       b.textContent = `${t.label} ${state.tickets.filter(t.filter).length}`;
       b.addEventListener("click", () => {
         tab = t.id;
+        searchEl.value = ""; // elegir una pestaña sale de la búsqueda
         try {
           localStorage.setItem("tickets-tab", tab);
         } catch {
@@ -145,19 +189,25 @@ export function mountTickets(root: HTMLElement, api: RollertermApi): void {
       tabsEl.append(b);
     }
 
-    const rows = state.tickets.filter(TABS.find((t) => t.id === tab)!.filter).sort(byUrgency);
+    const searching = query() !== "";
+    tabsEl.classList.toggle("dim", searching);
+    const rows = currentRows();
+    const n = queryNumber();
+    openNumBtn.hidden = n === null || rows.some((t) => t.numero === n);
+    openNumBtn.textContent = `Abrir el ticket #${n} ↵`;
     tbody.innerHTML = "";
     table.hidden = rows.length === 0;
-    table.classList.toggle("hide-who", tab === "mine");
+    table.classList.toggle("hide-who", tab === "mine" && !searching);
     emptyEl.hidden = rows.length > 0;
-    emptyEl.textContent = status === "loading" ? "Leyendo los tickets…" : "No hay tickets en esta pestaña.";
+    emptyEl.textContent =
+      status === "loading" ? "Leyendo los tickets…" : searching ? "Ningún ticket abierto coincide con la búsqueda." : "No hay tickets en esta pestaña.";
     for (const t of rows) tbody.append(renderRow(t));
   }
 
   function renderRow(t: Ticket): HTMLTableRowElement {
     const tr = document.createElement("tr");
     tr.classList.toggle("sla", t.slaVencido);
-    tr.title = state?.webUrl ? "Abrir en Pxsol Agencias" : "";
+    tr.title = "Ver el ticket completo";
     tr.addEventListener("click", () => open(t));
     const cell = (text: string, cls?: string) => {
       const td = document.createElement("td");
