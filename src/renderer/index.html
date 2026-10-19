@@ -27,10 +27,14 @@
     <div id="splitter" title="Arrastrá para agrandar la terminal · doble clic: agrandar / restaurar"></div>
     <section id="terminals">
       <nav id="tabbar">
+        <div class="tabbar-head">
+          <span class="tabbar-title">Terminales</span>
+          <button id="toggle-max" title="Agrandar la terminal hacia arriba (⌘⇧Enter)">⤒</button>
+        </div>
+        <button id="new-tab" title="Nueva pestaña: elegí la carpeta (⌘T)"><span class="plus">+</span>Nueva pestaña</button>
         <div id="tabs"></div>
-        <button id="new-tab" title="Nueva pestaña: elegí la carpeta (⌘T)">+</button>
-        <button id="toggle-max" title="Agrandar la terminal hacia arriba (⌘⇧Enter)">⤒</button>
       </nav>
+      <div id="tabbar-resizer" title="Arrastrá para cambiar el ancho de las pestañas · doble clic: ancho por defecto"></div>
       <main id="panes"></main>
     </section>
     <script src="renderer.js"></script>

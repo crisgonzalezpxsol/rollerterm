@@ -49,7 +49,7 @@ body { display: flex; flex-direction: column; }
 #top, #terminals { flex: 1 1 0; min-height: 0; }
 #top { display: flex; background: var(--panel); }
 #top[hidden] { display: none; }
-#terminals { display: flex; flex-direction: column; }
+#terminals { display: flex; flex-direction: row; }
 /* Divisor entre paneles y terminales: arrastrarlo agranda la terminal hacia arriba. */
 #splitter {
   position: relative;
@@ -62,58 +62,106 @@ body { display: flex; flex-direction: column; }
 #splitter::before { content: ""; position: absolute; inset: -4px 0; }
 #splitter:hover, #splitter.dragging { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 
+/* Pestañas en una columna a la izquierda (como Arc): se lee el nombre entero y la carpeta. */
 #tabbar {
   display: flex;
-  align-items: flex-end;
-  height: 34px;
-  padding: 0 8px;
+  flex-direction: column;
+  gap: 4px;
+  width: 230px;
+  min-width: 0;
+  padding: 6px 6px 8px;
   background: var(--bar);
   user-select: none;
   flex-shrink: 0;
 }
+.tabbar-head { display: flex; align-items: center; height: 24px; padding: 0 2px 0 8px; }
+.tabbar-title {
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Borde derecho de la columna: arrastrarlo cambia el ancho. */
+#tabbar-resizer {
+  position: relative;
+  width: 1px;
+  flex-shrink: 0;
+  background: var(--line);
+  cursor: col-resize;
+  z-index: 2;
+}
+#tabbar-resizer::before { content: ""; position: absolute; inset: 0 -4px; }
+#tabbar-resizer:hover, #tabbar-resizer.dragging { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 
 #tabs {
   display: flex;
+  flex-direction: column;
   gap: 2px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-#tabs::-webkit-scrollbar { display: none; }
+#tabs::-webkit-scrollbar { width: 6px; }
+#tabs::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+#tabs:hover::-webkit-scrollbar-thumb { background: #ffffff26; }
 
 .tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
-  min-width: 90px;
-  max-width: 220px;
-  height: 30px;
-  padding: 0 6px 0 12px;
-  background: var(--tab);
+  min-height: 40px;
+  padding: 5px 4px 5px 10px;
   color: var(--text-muted);
-  border-radius: 6px 6px 0 0;
+  border-radius: 8px;
   cursor: default;
   flex-shrink: 0;
 }
-.tab.active { position: relative; background: var(--tab-active); color: var(--text); }
-/* Pestaña activa: una línea RGB arriba. */
+.tab:hover { background: #ffffff0d; }
+.tab.active { background: var(--tab); color: var(--text); box-shadow: 0 1px 0 #ffffff0f inset, 0 2px 6px #0004; }
+/* Pestaña activa: una línea RGB a la izquierda. */
 .tab.active::before {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  border-radius: 6px 6px 0 0;
-  background: var(--rgb);
-  background-size: 300% 100%;
-  animation: rgb-flow 8s linear infinite;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #3ee8ff, #7c5cff, #ff3d9a, #ffa53d, #3ee8ff);
+  background-size: 100% 300%;
+  animation: rgb-flow-vertical 8s linear infinite;
 }
 .tab.ended .label { color: var(--ended); font-style: italic; }
-.tab.drag-over { box-shadow: inset 2px 0 0 var(--accent); }
+.tab.drag-over { box-shadow: inset 0 2px 0 var(--accent); }
 
-.tab .label { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tab .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+/* El nombre ocupa hasta dos líneas antes de cortarse. */
+.tab .label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+.tab .path {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl; /* si no entra, se corta el principio y queda visible la carpeta final */
+  text-align: left;
+  color: var(--text-muted);
+  font-size: 10px;
+  opacity: 0.75;
+}
 
 .tab input {
-  flex: 1;
   min-width: 0;
   font: inherit;
   color: var(--text);
@@ -125,6 +173,8 @@ body { display: flex; flex-direction: column; }
 }
 
 .tab .close {
+  align-self: flex-start;
+  flex-shrink: 0;
   width: 18px;
   height: 18px;
   border: 0;
@@ -139,26 +189,29 @@ body { display: flex; flex-direction: column; }
 .tab .close:hover { opacity: 1; background: #ffffff1a; }
 
 #new-tab {
-  margin: 0 0 4px 6px;
-  width: 24px;
-  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 18px;
-  line-height: 1;
+  font: inherit;
+  text-align: left;
+  flex-shrink: 0;
 }
+#new-tab .plus { width: 14px; font-size: 16px; line-height: 1; text-align: center; }
 #new-tab:hover, #toggle-max:hover { background: #ffffff1a; color: var(--text); }
 #toggle-max {
-  margin: 0 0 4px auto;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
 }
 
@@ -735,8 +788,9 @@ pre.detail[hidden] { display: none; }
 
 /* El degradé se desplaza despacio: el borde "corre" como un LED. */
 @keyframes rgb-flow { to { background-position: 0 0, 300% 0; } }
-.tab.active::before, #titlebar::after { animation-name: rgb-flow-single; }
+#titlebar::after { animation-name: rgb-flow-single; }
 @keyframes rgb-flow-single { to { background-position: 300% 0; } }
+@keyframes rgb-flow-vertical { to { background-position: 0 300%; } }
 @media (prefers-reduced-motion: reduce) {
   .ev-join, .mail-summarize, .notes-new, .browser-test, .pomo-test, .tab.active::before, #titlebar::after,
   #pomodoro > .pomo-display { animation: none !important; }

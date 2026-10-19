@@ -139,11 +139,19 @@ function createTab(opts: { id?: string; name?: string; cwd?: string } = {}, focu
   tabEl.draggable = true;
   const labelEl = document.createElement("span");
   labelEl.className = "label";
+  // Segunda línea: la carpeta, para distinguir pestañas con nombres parecidos.
+  const pathEl = document.createElement("span");
+  pathEl.className = "path";
+  // Las marcas LRM evitan que "~" y "/" se acomoden al revés por el direction: rtl del CSS.
+  pathEl.textContent = `\u200e${shortPath(opts.cwd ?? "") || "~"}\u200e`;
+  const textEl = document.createElement("div");
+  textEl.className = "text";
+  textEl.append(labelEl, pathEl);
   const closeBtn = document.createElement("button");
   closeBtn.className = "close";
   closeBtn.textContent = "×";
   closeBtn.title = "Cerrar (⌘W)";
-  tabEl.append(labelEl, closeBtn);
+  tabEl.append(textEl, closeBtn);
   tabsEl.appendChild(tabEl);
 
   const tab: Tab = { id, name: opts.name ?? `Terminal ${counter}`, cwd: opts.cwd ?? "", term, fit, pane, tabEl, labelEl, alive: false };
@@ -208,10 +216,15 @@ function closeTab(tab: Tab) {
   scheduleSave();
 }
 
+/** /Users/fulano/x → ~/x */
+function shortPath(path: string) {
+  return path.replace(/^\/Users\/[^/]+/, "~");
+}
+
 function setName(tab: Tab, name: string) {
   tab.name = name;
   tab.labelEl.textContent = name;
-  tab.tabEl.title = name;
+  tab.tabEl.title = tab.cwd ? `${name}\n${shortPath(tab.cwd)}` : name;
   if (active === tab) document.title = name;
 }
 
@@ -296,6 +309,41 @@ splitter.addEventListener("pointerdown", (e) => {
 splitter.addEventListener("dblclick", toggleMax);
 maxBtn.addEventListener("click", toggleMax);
 applyShare(terminalShare);
+
+// ---------- ancho de la columna de pestañas ----------
+
+const tabbarEl = document.getElementById("tabbar") as HTMLElement;
+const tabbarResizer = document.getElementById("tabbar-resizer") as HTMLDivElement;
+const TABBAR_DEFAULT = 230;
+function applyTabbarWidth(width: number) {
+  const w = Math.round(Math.min(480, Math.max(150, width)));
+  tabbarEl.style.width = `${w}px`;
+  try {
+    localStorage.setItem("tabbar-width", String(w));
+  } catch {
+    // no importa si no se puede recordar
+  }
+}
+try {
+  applyTabbarWidth(Number(localStorage.getItem("tabbar-width")) || TABBAR_DEFAULT);
+} catch {
+  applyTabbarWidth(TABBAR_DEFAULT);
+}
+tabbarResizer.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  tabbarResizer.setPointerCapture(e.pointerId);
+  tabbarResizer.classList.add("dragging");
+  const left = tabbarEl.getBoundingClientRect().left;
+  const onMove = (ev: PointerEvent) => applyTabbarWidth(ev.clientX - left);
+  const onUp = () => {
+    tabbarResizer.classList.remove("dragging");
+    tabbarResizer.removeEventListener("pointermove", onMove);
+    tabbarResizer.removeEventListener("pointerup", onUp);
+  };
+  tabbarResizer.addEventListener("pointermove", onMove);
+  tabbarResizer.addEventListener("pointerup", onUp);
+});
+tabbarResizer.addEventListener("dblclick", () => applyTabbarWidth(TABBAR_DEFAULT));
 
 // ---------- renombrar ----------
 
@@ -390,7 +438,7 @@ api.onMenu((cmd: MenuCommand) => {
 
 newTabBtn.addEventListener("click", () => void newTab());
 tabsEl.addEventListener("dblclick", (e) => {
-  if (e.target === tabsEl) void newTab(); // doble clic en el hueco de la barra abre una pestaña
+  if (e.target === tabsEl) void newTab(); // doble clic en el hueco de la lista abre una pestaña
 });
 
 new ResizeObserver(() => active?.fit.fit()).observe(panesEl);
