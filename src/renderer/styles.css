@@ -45,6 +45,14 @@ body { display: flex; flex-direction: column; }
 .app-logo { width: 22px; height: 22px; margin-right: 6px; }
 .app-name { color: var(--text-muted); font-weight: 600; }
 
+/* Notas y asistente se acomodan a la derecha y corren todo lo demás (no lo tapan). */
+body { --dock: 0px; }
+body.dock-notes { --dock: min(420px, 100vw); }
+body.dock-assistant { --dock: var(--assistant-w, 520px); }
+#top, #splitter, #terminals { margin-right: var(--dock); transition: margin-right 0.18s ease; }
+body.resizing-dock #top, body.resizing-dock #splitter, body.resizing-dock #terminals { transition: none; }
+body.resizing-dock { cursor: col-resize; user-select: none; }
+
 /* Mitad de arriba: agenda y correo. Mitad de abajo: terminales. */
 #top, #terminals { flex: 1 1 0; min-height: 0; }
 #top { display: flex; background: var(--panel); }
@@ -567,7 +575,7 @@ pre.detail[hidden] { display: none; }
 .mt-actions button:hover { background: #ffffff1a; }
 
 /* ---------- configuración ---------- */
-#open-settings, #toggle-notes, #toggle-mute, #toggle-assistant {
+#open-settings, #toggle-notes, #toggle-mute {
   -webkit-app-region: no-drag;
   width: 26px;
   height: 24px;
@@ -578,7 +586,46 @@ pre.detail[hidden] { display: none; }
   color: var(--text-muted);
   font-size: 15px;
 }
-#open-settings:hover, #toggle-notes:hover, #toggle-notes.on, #toggle-mute:hover, #toggle-assistant:hover, #toggle-assistant.on { background: #ffffff1a; color: var(--text); }
+#open-settings:hover, #toggle-notes:hover, #toggle-notes.on, #toggle-mute:hover { background: #ffffff1a; color: var(--text); }
+
+/* Botón del asistente: una píldora con nombre, borde RGB que corre mientras responde y un
+   punto cuando llegó una respuesta con el panel cerrado. */
+#toggle-assistant {
+  -webkit-app-region: no-drag;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  margin-left: 8px;
+  padding: 0 11px 0 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(var(--bar), var(--bar)) padding-box, linear-gradient(90deg, #3ee8ff88, #7c5cffaa, #ff3d9a88) border-box;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+}
+#toggle-assistant .ta-icon {
+  font-size: 12px;
+  background: linear-gradient(135deg, #3ee8ff, #a78bff 45%, #ff6ab4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+#toggle-assistant:hover { background: linear-gradient(#2a2360, #2a2360) padding-box, var(--rgb) border-box; }
+#toggle-assistant.on { background: linear-gradient(var(--rgb-fill), var(--rgb-fill)) padding-box, var(--rgb) border-box; box-shadow: var(--rgb-glow); }
+#toggle-assistant.busy {
+  border-width: 2px;
+  padding: 0 10px 0 8px;
+  background: linear-gradient(var(--rgb-fill), var(--rgb-fill)) padding-box, var(--rgb) border-box;
+  background-size: 100% 100%, 300% 100%;
+  animation: rgb-flow 3s linear infinite;
+}
+#toggle-assistant.busy .ta-icon { animation: ta-spin 2.4s linear infinite; display: inline-block; }
+@keyframes ta-spin { to { transform: rotate(360deg); } }
+.ta-dot { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: #ff3d9a; box-shadow: 0 0 0 2px var(--bar), 0 0 8px #ff3d9a; }
+.ta-dot[hidden] { display: none; }
 #toggle-mute.on { background: #e0675a33; }
 
 #settings {
@@ -783,7 +830,6 @@ pre.detail[hidden] { display: none; }
   flex-direction: column;
   background: var(--bar);
   border-left: 1px solid var(--line);
-  box-shadow: -12px 0 40px #0008;
   transform: translateX(105%);
   transition: transform 0.18s ease;
   visibility: hidden;
@@ -828,6 +874,32 @@ pre.detail[hidden] { display: none; }
   font: 13px/1.55 -apple-system, BlinkMacSystemFont, sans-serif;
 }
 .notes-text::placeholder { color: #666; }
+.notes-text[hidden], .notes-render[hidden], #notes header button[hidden] { display: none; }
+.notes-render {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.55 -apple-system, BlinkMacSystemFont, sans-serif;
+  outline: none;
+  user-select: text;
+}
+.notes-md p { margin: 0 0 6px; }
+.notes-md .md-h { font-weight: 700; }
+.notes-md ul, .notes-md ol { margin: 2px 0 6px; padding-left: 20px; }
+.notes-md code { padding: 0 4px; border-radius: 3px; background: #ffffff14; font: 12px Menlo, monospace; }
+.notes-md pre { padding: 8px; border-radius: 6px; background: var(--input); font: 12px Menlo, monospace; white-space: pre-wrap; }
+.notes-md a { color: #9d8cff; }
+.notes-title { margin-bottom: 8px; font-size: 15px; font-weight: 700; }
+.notes-item { display: flex; align-items: flex-start; gap: 8px; padding: 3px 6px; margin: 0 -6px; border-radius: 5px; cursor: pointer; }
+.notes-item:hover { background: #ffffff0a; }
+.notes-item input { margin: 3px 0 0; accent-color: var(--accent); width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
+.notes-item.done span { color: var(--text-muted); text-decoration: line-through; }
+.notes-render .notes-empty { color: var(--text-muted); }
+.notes-progress { margin-right: 6px; padding: 0 6px; border-radius: 8px; background: #7c5cff26; color: #c4b5ff; font-size: 10px; }
+.notes-progress.complete { background: #5ab37a33; color: #8fd4a8; }
 
 /* ---------- efecto RGB ---------- */
 /* Línea RGB fina bajo la barra de título. */
@@ -881,7 +953,7 @@ pre.detail[hidden] { display: none; }
 @keyframes rgb-flow-vertical { to { background-position: 0 300%; } }
 @media (prefers-reduced-motion: reduce) {
   .ev-join, .mail-summarize, .notes-new, .browser-test, .pomo-test, .tab.active::before, #titlebar::after,
-  #pomodoro > .pomo-display { animation: none !important; }
+  #pomodoro > .pomo-display, #toggle-assistant.busy, #toggle-assistant.busy .ta-icon { animation: none !important; }
 }
 
 /* ---------- asistente (panel lateral del chat) ---------- */
@@ -891,17 +963,19 @@ pre.detail[hidden] { display: none; }
   right: 0;
   bottom: 0;
   z-index: 30;
-  width: min(560px, 100vw);
+  width: var(--assistant-w, 520px);
+  max-width: 100vw;
   display: flex;
   flex-direction: column;
   background: var(--bar);
   border-left: 1px solid var(--line);
-  box-shadow: -12px 0 40px #0008;
   transform: translateX(105%);
   transition: transform 0.18s ease;
   visibility: hidden;
 }
 #assistant.open { transform: none; visibility: visible; }
+.as-resizer { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 3; }
+.as-resizer:hover { background: linear-gradient(90deg, transparent 3px, var(--accent) 3px, var(--accent) 5px, transparent 5px); }
 #assistant > header { display: flex; align-items: flex-start; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-shrink: 0; position: relative; }
 #assistant > header::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--rgb); background-size: 300% 100%; opacity: 0.6; animation: rgb-flow-single 10s linear infinite; }
 #assistant h2 { margin: 0; font-size: 14px; font-weight: 600; }

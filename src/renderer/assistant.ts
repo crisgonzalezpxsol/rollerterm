@@ -25,6 +25,7 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
   const aside = document.createElement("aside");
   aside.id = "assistant";
   aside.innerHTML = `
+    <div class="as-resizer" title="Arrastrá para cambiar el ancho · doble clic: ancho por defecto"></div>
     <header>
       <div>
         <h2>Asistente</h2>
@@ -183,7 +184,49 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     sendBtn.textContent = value ? "Detener" : "Enviar";
     sendBtn.classList.toggle("stop", value);
     aside.classList.toggle("busy", value);
+    toggleBtn?.classList.toggle("busy", value);
   }
+
+  // ---------- botón de la barra y ancho del panel ----------
+
+  const toggleBtn = document.getElementById("toggle-assistant");
+  const dot = toggleBtn?.querySelector<HTMLSpanElement>(".ta-dot") ?? null;
+  /** Punto en el botón: hay una respuesta que no se vio (llegó con el panel cerrado). */
+  function setUnread(value: boolean) {
+    if (dot) dot.hidden = !value;
+    toggleBtn?.classList.toggle("unread", value);
+  }
+
+  const DEFAULT_WIDTH = 520;
+  function applyWidth(px: number) {
+    const w = Math.round(Math.min(Math.max(360, px), Math.max(380, window.innerWidth - 480)));
+    document.body.style.setProperty("--assistant-w", `${w}px`);
+    try {
+      localStorage.setItem("assistant-width", String(w));
+    } catch {
+      // no importa si no se puede recordar
+    }
+  }
+  try {
+    applyWidth(Number(localStorage.getItem("assistant-width")) || DEFAULT_WIDTH);
+  } catch {
+    applyWidth(DEFAULT_WIDTH);
+  }
+  const resizer = aside.querySelector(".as-resizer") as HTMLDivElement;
+  resizer.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    resizer.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing-dock");
+    const onMove = (ev: PointerEvent) => applyWidth(window.innerWidth - ev.clientX);
+    const onUp = () => {
+      document.body.classList.remove("resizing-dock");
+      resizer.removeEventListener("pointermove", onMove);
+      resizer.removeEventListener("pointerup", onUp);
+    };
+    resizer.addEventListener("pointermove", onMove);
+    resizer.addEventListener("pointerup", onUp);
+  });
+  resizer.addEventListener("dblclick", () => applyWidth(DEFAULT_WIDTH));
 
   // ---------- eventos del asistente ----------
 
@@ -231,7 +274,10 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
       if (voiceOn && !isMuted() && !e.message.error) read(e.message.text, done.querySelector(".as-play"));
       setBusy(false);
       scrollDown(true);
-      if (!open) notify("💬 Respondió el asistente", e.message.text.slice(0, 120), () => panel.toggle());
+      if (!open) {
+        setUnread(true);
+        notify("💬 Respondió el asistente", e.message.text.slice(0, 120), () => panel.toggle());
+      }
     } else if (e.type === "event") {
       bubble(e.message);
       scrollDown(true);
@@ -277,15 +323,6 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     }
   });
   aside.querySelector(".as-close")!.addEventListener("click", () => panel.close());
-  // Clic afuera del panel lo cierra (menos el botón 💬, que ya lo alterna).
-  document.addEventListener(
-    "mousedown",
-    (e) => {
-      const target = e.target as Node;
-      if (open && !aside.contains(target) && !document.getElementById("toggle-assistant")?.contains(target)) panel.close();
-    },
-    true,
-  );
   aside.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -331,7 +368,10 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
       hooks.onOpen();
       open = true;
       aside.classList.add("open");
-      document.getElementById("toggle-assistant")?.classList.add("on");
+      // Se acomoda al costado: corre la agenda y las terminales en vez de taparlas.
+      document.body.classList.add("dock-assistant");
+      toggleBtn?.classList.add("on");
+      setUnread(false);
       if (!loaded) void loadHistory().then(() => input.focus());
       else {
         scrollDown(true);
@@ -342,7 +382,8 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
       if (!open) return;
       open = false;
       aside.classList.remove("open");
-      document.getElementById("toggle-assistant")?.classList.remove("on");
+      document.body.classList.remove("dock-assistant");
+      toggleBtn?.classList.remove("on");
       hooks.onClose();
     },
   };
