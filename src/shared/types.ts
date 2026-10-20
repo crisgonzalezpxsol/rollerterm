@@ -252,6 +252,30 @@ export interface ProdService {
   /** Cuándo se creó el último deploy (ISO). */
   since: string | null;
   url: string;
+  /** De dónde despliega (servicios conectados a GitHub); null en bases de datos e imágenes. */
+  repo: string | null;
+  branch: string | null;
+  /** Commit completo del último deploy. */
+  commit: string | null;
+  /** Railway lleva más de 3 h sin desplegar lo último (aunque el servicio siga andando). */
+  stale: StaleDeploy | null;
+}
+
+/**
+ * Lo que Railway no desplegó: un commit de la rama que no generó ningún deploy (ni siquiera
+ * uno salteado por watch paths), o un deploy trabado en cola o construyendo.
+ */
+export interface StaleDeploy {
+  kind: "missing" | "stuck";
+  /** "PXSOL/pxsol-agencias". */
+  repo: string | null;
+  branch: string | null;
+  /** Hash corto del commit sin desplegar (o del deploy trabado). */
+  commit: string | null;
+  /** Primera línea del mensaje del commit. */
+  message: string | null;
+  /** Desde cuándo está pendiente (ISO): el push del commit o el inicio del deploy trabado. */
+  since: string;
 }
 
 export interface ProdState {

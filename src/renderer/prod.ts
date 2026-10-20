@@ -1,6 +1,7 @@
 // Indicador de producción (Railway) en la barra de título: un punto de color con
-// "Prod OK/total" y, al hacer clic, el detalle de lo que no está bien.
-import type { ProdService, ProdState, RollertermApi, ServiceHealth } from "../shared/types";
+// "Prod OK/total" y, al hacer clic, el detalle de lo que no está bien. Si Railway lleva más de
+// 3 h sin desplegar un push (o con un deploy trabado), se agrega un ⚠ y se avisa una vez.
+import type { ProdService, ProdState, RollertermApi, ServiceHealth, StaleDeploy } from "../shared/types";
 import { fmtTime } from "./connector";
 import { notify } from "./notify";
 
@@ -41,6 +42,7 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
         <button class="prod-refresh" title="Revisar ahora">↻</button>
       </div>
       <p class="prod-summary"></p>
+      <div class="prod-stale" hidden></div>
       <ol class="prod-list"></ol>
       <button class="prod-config">Elegir proyectos…</button>
     </div>`;
@@ -53,6 +55,9 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
   const refresh = $<HTMLButtonElement>(".prod-refresh");
   const summary = $<HTMLParagraphElement>(".prod-summary");
   const list = $<HTMLOListElement>(".prod-list");
+  const staleEl = $<HTMLDivElement>(".prod-stale");
+  /** Lo que ya se avisó que no se desplegó: una notificación por commit (o deploy trabado). */
+  const warned = new Set<string>();
 
   let state: ProdState | null = null;
   /** Salud anterior de cada servicio, para avisar solo cuando cambia. */
@@ -73,6 +78,36 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
   });
 
   const keyOf = (s: ProdService) => `${s.projectId}/${s.serviceId}`;
+
+  /** Lo que no se desplegó, agrupado: un mismo push suele afectar a varios servicios. */
+  function staleGroups(services: ProdService[]) {
+    const groups = new Map<string, { stale: StaleDeploy; services: ProdService[] }>();
+    for (const x of services) {
+      if (!x.stale) continue;
+      const key = x.stale.kind === "stuck" ? `stuck/${keyOf(x)}` : `${x.stale.repo}@${x.stale.branch}@${x.stale.commit}`;
+      const g = groups.get(key) ?? { stale: x.stale, services: [] };
+      g.services.push(x);
+      groups.set(key, g);
+    }
+    return [...groups.entries()].map(([key, g]) => ({ key, ...g }));
+  }
+
+  function staleTitle(st: StaleDeploy): string {
+    return st.kind === "stuck"
+      ? `Deploy trabado ${ago(Date.parse(st.since)).replace("hace ", "desde hace ")}`
+      : `Railway no desplegó ${st.repo?.split("/").pop()}@${st.branch}`;
+  }
+
+  function checkStale(s: ProdState) {
+    if (s.status !== "ok" || s.checking) return;
+    for (const g of staleGroups(s.services)) {
+      if (warned.has(g.key)) continue;
+      warned.add(g.key);
+      const names = g.services.map((x) => x.serviceName).join(", ");
+      const what = g.stale.kind === "stuck" ? names : `${g.stale.commit} «${g.stale.message ?? ""}» · ${names}`;
+      notify(`⚠️ ${staleTitle(g.stale)}`, `${what} · ${ago(Date.parse(g.stale.since))}`, () => window.open(g.services[0].url));
+    }
+  }
 
   function checkTransitions(s: ProdState) {
     if (s.status !== "ok" || s.checking) return;
@@ -108,18 +143,42 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
     const problem = state.status !== "ok" && state.status !== "loading";
 
     const none = state.status === "ok" && services.length === 0;
+    const stale = staleGroups(services);
     dot.dataset.health = problem || none ? "unknown" : state.status === "loading" ? "loading" : worst;
     text.textContent =
-      state.status === "loading" ? "Prod…" : problem ? "Prod ?" : none ? "Prod –" : `Prod ${okCount}/${services.length}`;
+      state.status === "loading" ? "Prod…" : problem ? "Prod ?" : none ? "Prod –" : `Prod ${okCount}/${services.length}${stale.length ? " ⚠ sin deploy" : ""}`;
+    badge.classList.toggle("stale", stale.length > 0 && !problem);
     badge.title = problem
       ? `Producción: ${state.message ?? ""}`
-      : `Producción · ${HEALTH_LABEL[worst]}${state.lastCheck ? ` · revisado ${fmtTime(state.lastCheck)}` : ""}`;
+      : `Producción · ${HEALTH_LABEL[worst]}${stale.length ? ` · ${stale.map((g) => staleTitle(g.stale)).join(" · ")}` : ""}${state.lastCheck ? ` · revisado ${fmtTime(state.lastCheck)}` : ""}`;
     refresh.disabled = state.checking;
     refresh.classList.toggle("spinning", state.checking);
     if (pop.hidden) return;
 
     when.textContent = state.lastCheck ? `revisado ${fmtTime(state.lastCheck)}` : "";
     list.innerHTML = "";
+    staleEl.replaceChildren();
+    staleEl.hidden = problem || !stale.length;
+    for (const g of problem ? [] : stale) {
+      const card = document.createElement("div");
+      card.className = "prod-stale-item";
+      card.title = "Abrir en Railway";
+      const title = document.createElement("strong");
+      title.textContent = `⚠️ ${staleTitle(g.stale)}`;
+      const detail = document.createElement("span");
+      detail.textContent =
+        g.stale.kind === "stuck"
+          ? `${g.services.map((x) => `${x.projectName} / ${x.serviceName}`).join(", ")} · ${STATUS_LABEL[g.services[0].status] ?? g.services[0].status}`
+          : `${g.stale.commit} «${g.stale.message ?? ""}» · pusheado ${ago(Date.parse(g.stale.since))}`;
+      const who = document.createElement("small");
+      who.textContent =
+        g.stale.kind === "stuck"
+          ? "Lleva más de 3 h sin terminar. Revisá el build o cancelalo y redesplegá."
+          : `Siguen en la versión anterior: ${g.services.map((x) => x.serviceName).join(", ")}. Redesplegá a mano o mirá status.railway.com.`;
+      card.append(title, detail, who);
+      card.addEventListener("click", () => window.open(g.services[0].url));
+      staleEl.append(card);
+    }
     if (problem) {
       summary.textContent = [state.message, PROBLEM_TEXT[state.status]].filter(Boolean).join(" ");
       return;
@@ -134,7 +193,9 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
     }
     summary.textContent = bad.length
       ? `${okCount} de ${services.length} servicios OK en ${projects} proyectos.`
-      : `Todo OK: ${services.length} servicios en ${projects} proyectos.`;
+      : stale.length
+        ? `${services.length} servicios corriendo en ${projects} proyectos, pero hay cambios sin desplegar:`
+        : `Todo OK: ${services.length} servicios en ${projects} proyectos.`;
     if (state.message) summary.textContent += ` ${state.message}`;
     for (const x of bad) {
       const li = document.createElement("li");
@@ -153,6 +214,7 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
   function onState(next: ProdState) {
     state = next;
     checkTransitions(next);
+    checkStale(next);
     render();
   }
 

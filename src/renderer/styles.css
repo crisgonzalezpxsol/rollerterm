@@ -745,6 +745,15 @@ pre.detail[hidden] { display: none; }
 .prod-list li:hover { background: #ffffff12; }
 .prod-list li[data-health="down"] { border-left-color: #e0675a; }
 .prod-list li strong { color: var(--text); font-weight: 600; }
+/* Railway no desplegó: aviso ámbar en el indicador y tarjeta en el detalle. */
+.prod-badge.stale { background: #d9a44126; color: #f0c674; box-shadow: inset 0 0 0 1px #d9a44166; }
+.prod-stale { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.prod-stale[hidden] { display: none; }
+.prod-stale-item { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 6px; background: #d9a4411a; border: 1px solid #d9a44155; cursor: pointer; }
+.prod-stale-item:hover { background: #d9a44128; }
+.prod-stale-item strong { color: #f0c674; font-weight: 600; }
+.prod-stale-item span { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prod-stale-item small { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
 .prod-list li span { color: var(--text-muted); }
 .prod-config { margin-top: 6px; border: 0; background: transparent; color: var(--accent); font: inherit; padding: 2px 0; }
 .prod-config:hover { text-decoration: underline; }

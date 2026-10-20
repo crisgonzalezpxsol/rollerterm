@@ -116,7 +116,16 @@ bridge.on("contexto_actual", async () => {
       mios: t.tickets.filter((x) => x.mine).map((x) => ({ numero: x.numero, asunto: x.asunto, estado: x.estado, prioridad: x.prioridad, slaVencido: x.slaVencido })),
       sinDueno: t.tickets.filter((x) => !x.atiende).map((x) => ({ numero: x.numero, asunto: x.asunto, prioridad: x.prioridad })),
     },
-    produccion: p.services.filter((x) => x.health !== "ok").map((x) => ({ servicio: `${x.projectName} / ${x.serviceName}`, salud: x.health, estado: x.status })),
+    produccion: p.services
+      .filter((x) => x.health !== "ok" || x.stale)
+      .map((x) => ({
+        servicio: `${x.projectName} / ${x.serviceName}`,
+        salud: x.health,
+        estado: x.status,
+        ...(x.stale && {
+          sinDesplegar: x.stale.kind === "stuck" ? `deploy trabado desde ${x.stale.since}` : `Railway no desplegó ${x.stale.commit} «${x.stale.message}» (pusheado ${x.stale.since})`,
+        }),
+      })),
   };
 });
 
