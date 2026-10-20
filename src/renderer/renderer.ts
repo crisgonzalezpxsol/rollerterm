@@ -11,6 +11,7 @@ import { mountTicketView } from "./ticket-view";
 import { mountMail } from "./mail";
 import { mountNotes } from "./notes";
 import { setMuted } from "./notify";
+import { setVoicePrefs } from "./speech";
 import { baseName, mountPathPicker } from "./path-picker";
 import { mountPomodoro } from "./pomodoro";
 import { mountProd } from "./prod";
@@ -50,6 +51,7 @@ const muteBtn = document.getElementById("toggle-mute") as HTMLButtonElement;
 function applySettings(s: Settings) {
   settings = s;
   setMuted(s.muted);
+  setVoicePrefs(s.assistant.voice, s.assistant.rate);
   muteBtn.textContent = s.muted ? "🔕" : "🔔";
   muteBtn.classList.toggle("on", s.muted);
   muteBtn.title = s.muted ? "Silenciado: sin sonidos ni avisos. Clic para activar (⌘⇧M)" : "Silenciar sonidos y avisos (⌘⇧M)";
@@ -636,7 +638,9 @@ api.onExit((id, code) => {
 api.onMenu((cmd: MenuCommand) => {
   const order = visualOrder();
   const idx = active ? order.indexOf(active) : -1;
-  if (cmd === "new-tab") void newTab();
+  // Con el foco en el chat, ⌘T abre una conversación nueva y no una terminal.
+  if (cmd === "new-tab" && assistantPanel.hasFocus) assistantPanel.newConversation();
+  else if (cmd === "new-tab") void newTab();
   // Con las notas abiertas, ⌘W las cierra en vez de cerrar la pestaña de la terminal.
   else if (cmd === "close-tab" && notesPanel.isOpen) notesPanel.close();
   else if (cmd === "close-tab" && assistantPanel.isOpen) assistantPanel.close();

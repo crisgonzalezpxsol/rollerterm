@@ -8,6 +8,8 @@
 
 const BRIDGE = process.env.RT_BRIDGE;
 const TOKEN = process.env.RT_TOKEN;
+// De qué conversación del asistente es este Claude (para que las aprobaciones caigan en su chat).
+const CONV = process.env.RT_CONV || null;
 
 const TOOLS = [
   {
@@ -75,7 +77,7 @@ async function bridge(name, args) {
     const res = await fetch(`${BRIDGE}/tool`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-rt-token": TOKEN },
-      body: JSON.stringify({ name, args }),
+      body: JSON.stringify({ name, args, conv: CONV }),
       // Una aprobación espera a que el usuario conteste: sin tope corto.
       signal: AbortSignal.timeout(name === "aprobar" ? 30 * 60_000 : 30_000),
     });

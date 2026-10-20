@@ -3,7 +3,8 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 
-export type ToolHandler = (args: Record<string, unknown>) => Promise<unknown>;
+/** `conv`: la conversación del asistente que hizo la llamada (cada Claude la recibe por entorno). */
+export type ToolHandler = (args: Record<string, unknown>, ctx: { conv: string | null }) => Promise<unknown>;
 
 export class Bridge {
   readonly token = randomBytes(24).toString("hex");
@@ -30,10 +31,10 @@ export class Bridge {
       });
       req.on("end", async () => {
         try {
-          const { name, args } = JSON.parse(raw) as { name: string; args: Record<string, unknown> };
+          const { name, args, conv } = JSON.parse(raw) as { name: string; args: Record<string, unknown>; conv?: string };
           const handler = this.handlers.get(name);
           if (!handler) return reply(200, { error: `Herramienta desconocida: ${name}` });
-          reply(200, await handler(args ?? {}));
+          reply(200, await handler(args ?? {}, { conv: conv || null }));
         } catch (err) {
           reply(200, { error: err instanceof Error ? err.message : String(err) });
         }

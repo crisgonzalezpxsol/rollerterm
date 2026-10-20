@@ -1,7 +1,8 @@
 // Asistente de la jornada: un chat con Claude Code que recuerda.
 //
-// - Una sesión de Claude por día: cada mensaje del día continúa la misma conversación
-//   (--resume), así tiene todo el contexto de la jornada.
+// - Varias conversaciones. La «Jornada» usa una sesión de Claude por día: cada mensaje del día
+//   continúa la misma conversación (--resume), así tiene todo el contexto de la jornada. Las
+//   demás son hilos aparte con su propia sesión, y pueden responder a la vez que la Jornada.
 // - Memoria de largo plazo en archivos, en su carpeta de trabajo: memoria.md (lo durable) y
 //   diario/AAAA-MM-DD.md (lo de cada día). Claude los mantiene y los consulta solo.
 // - Herramientas: las de rollerterm (notas, recordatorios, contexto de la app) por un MCP
@@ -10,14 +11,16 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { app } from "electron";
-import type { ApprovalRequest, ChatMessage, ChatStreamEvent } from "../shared/types";
+import type { ApprovalRequest, ChatMessage, ChatStreamEvent, Conversation } from "../shared/types";
 import type { Bridge } from "./bridge";
 import { mcpPrefix, type ClaudeRunner } from "./claude-runner";
 
 const HISTORY_LIMIT = 600;
+/** La conversación de la jornada: siempre existe y no se borra. */
+const DAILY_ID = "jornada";
 const RESPONSE_TIMEOUT_MS = 10 * 60_000;
 
 const GMAIL = "mcp__claude_ai_Gmail__";
@@ -141,12 +144,28 @@ function describe(tool: string, input: Record<string, unknown>): string {
   return lines.join("\n");
 }
 
+/** Lo que se guarda de cada conversación (sin el estado en vivo). */
+interface StoredConversation {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  daily: boolean;
+  /** Sesión de Claude de un hilo aparte (la Jornada usa una por día, en sesiones.json). */
+  sessionId?: string;
+  /** Ya tuvo una respuesta: los mensajes siguientes van con --resume. */
+  started?: boolean;
+}
+
+type Emit = ChatStreamEvent extends infer E ? (E extends { convId: string } ? Omit<E, "convId"> : never) : never;
+
 export class Assistant {
   readonly dir = join(app.getPath("userData"), "asistente");
-  private history: ChatMessage[] = [];
+  private convs: StoredConversation[] = [];
+  private histories = new Map<string, ChatMessage[]>();
   private sessions: Record<string, string> = {};
-  private child: ChildProcess | null = null;
-  private approvals = new Map<string, (approved: boolean) => void>();
+  private children = new Map<string, ChildProcess>();
+  private approvals = new Map<string, { conv: string; resolve: (approved: boolean) => void }>();
 
   constructor(
     private claude: ClaudeRunner,
@@ -158,8 +177,22 @@ export class Assistant {
     },
   ) {}
 
+  private emit(convId: string, event: Emit): void {
+    this.opts.emit({ convId, ...event } as ChatStreamEvent);
+  }
+
+  private get convDir(): string {
+    return join(this.dir, "conversaciones");
+  }
+
+  private file(convId: string): string {
+    // La Jornada sigue en chat.jsonl (así no se mueve el historial que ya había).
+    return convId === DAILY_ID ? join(this.dir, "chat.jsonl") : join(this.convDir, `${convId}.jsonl`);
+  }
+
   async start(): Promise<void> {
     await mkdir(join(this.dir, "diario"), { recursive: true });
+    await mkdir(this.convDir, { recursive: true });
     await writeFile(join(this.dir, "CLAUDE.md"), INSTRUCTIONS);
     // El MCP de rollerterm va como servidor del proyecto (.mcp.json en la carpeta) y no con
     // --mcp-config: con esa opción Claude Code espera a que conecten TODOS los servidores de la
@@ -174,7 +207,7 @@ export class Assistant {
               args: [join(__dirname, "rollerterm-mcp.cjs")],
               // Electron hace de Node (no hace falta tener node instalado); el puerto y el token
               // del puente cambian en cada arranque y llegan por el entorno de Claude Code.
-              env: { ELECTRON_RUN_AS_NODE: "1", RT_BRIDGE: "${RT_BRIDGE}", RT_TOKEN: "${RT_TOKEN}" },
+              env: { ELECTRON_RUN_AS_NODE: "1", RT_BRIDGE: "${RT_BRIDGE}", RT_TOKEN: "${RT_TOKEN}", RT_CONV: "${RT_CONV}" },
             },
           },
         },
@@ -188,8 +221,37 @@ export class Assistant {
       await writeFile(join(this.dir, "memoria.md"), "# Memoria\n\nLo que conviene recordar siempre.\n");
     }
     try {
-      const raw = await readFile(join(this.dir, "chat.jsonl"), "utf8");
-      this.history = raw
+      this.convs = JSON.parse(await readFile(join(this.dir, "conversaciones.json"), "utf8"));
+    } catch {
+      this.convs = [];
+    }
+    if (!this.convs.some((c) => c.id === DAILY_ID)) {
+      const now = Date.now();
+      this.convs.unshift({ id: DAILY_ID, title: "Jornada", createdAt: now, updatedAt: now, daily: true });
+      await this.saveIndex();
+    }
+    try {
+      this.sessions = JSON.parse(await readFile(join(this.dir, "sesiones.json"), "utf8"));
+    } catch {
+      this.sessions = {};
+    }
+    this.bridge.on("aprobar", (args, ctx) => this.requestApproval(args, ctx.conv ?? DAILY_ID));
+  }
+
+  list(): Conversation[] {
+    return this.convs.map(({ id, title, createdAt, updatedAt, daily }) => ({ id, title, createdAt, updatedAt, daily, busy: this.children.has(id) }));
+  }
+
+  private changed(): void {
+    this.emit(DAILY_ID, { type: "conversations", list: this.list() });
+  }
+
+  async history(convId: string): Promise<ChatMessage[]> {
+    const cached = this.histories.get(convId);
+    if (cached) return cached;
+    let messages: ChatMessage[] = [];
+    try {
+      messages = (await readFile(this.file(convId), "utf8"))
         .split("\n")
         .filter(Boolean)
         .flatMap((l) => {
@@ -201,64 +263,105 @@ export class Assistant {
         })
         .slice(-HISTORY_LIMIT);
     } catch {
-      this.history = [];
+      // conversación nueva: sin historial
     }
-    try {
-      this.sessions = JSON.parse(await readFile(join(this.dir, "sesiones.json"), "utf8"));
-    } catch {
-      this.sessions = {};
-    }
-    this.bridge.on("aprobar", (args) => this.requestApproval(args));
+    this.histories.set(convId, messages);
+    return messages;
   }
 
-  get busy(): boolean {
-    return this.child !== null;
+  async create(): Promise<Conversation> {
+    const now = Date.now();
+    const conv: StoredConversation = { id: randomUUID(), title: "Conversación nueva", createdAt: now, updatedAt: now, daily: false, sessionId: randomUUID() };
+    this.convs.push(conv);
+    this.histories.set(conv.id, []);
+    await this.saveIndex();
+    this.changed();
+    return this.list().find((c) => c.id === conv.id)!;
   }
 
-  recent(): ChatMessage[] {
-    return this.history;
+  async rename(convId: string, title: string): Promise<void> {
+    const conv = this.convs.find((c) => c.id === convId);
+    if (!conv || !title.trim()) return;
+    conv.title = title.trim().slice(0, 80);
+    await this.saveIndex();
+    this.changed();
   }
 
-  /** Un mensaje que no es de la conversación (un recordatorio que sonó, por ejemplo). */
+  async remove(convId: string): Promise<void> {
+    if (convId === DAILY_ID) throw new Error("La conversación de la jornada no se borra.");
+    this.stop(convId);
+    this.convs = this.convs.filter((c) => c.id !== convId);
+    this.histories.delete(convId);
+    await rm(this.file(convId), { force: true });
+    await this.saveIndex();
+    this.changed();
+  }
+
+  /** Un mensaje que no es de la conversación (un recordatorio que sonó, por ejemplo). Va a la Jornada. */
   async addEvent(text: string): Promise<void> {
     const message: ChatMessage = { id: randomUUID(), role: "event", text, at: Date.now() };
-    await this.append(message);
-    this.opts.emit({ type: "event", message });
+    await this.append(DAILY_ID, message);
+    this.emit(DAILY_ID, { type: "event", message });
   }
 
-  stop(): void {
-    this.child?.kill();
-    for (const resolve of this.approvals.values()) resolve(false);
-    this.approvals.clear();
+  stop(convId: string): void {
+    this.children.get(convId)?.kill();
+    for (const [id, a] of this.approvals) {
+      if (a.conv !== convId) continue;
+      a.resolve(false);
+      this.approvals.delete(id);
+    }
   }
 
   approve(id: string, approved: boolean): void {
-    this.approvals.get(id)?.(approved);
+    const a = this.approvals.get(id);
+    if (!a) return;
+    a.resolve(approved);
     this.approvals.delete(id);
-    this.opts.emit({ type: "approval-done", id, approved });
+    this.emit(a.conv, { type: "approval-done", id, approved });
   }
 
-  async send(text: string): Promise<void> {
-    if (this.child) throw new Error("Esperá a que termine la respuesta anterior.");
+  async send(convId: string, text: string): Promise<void> {
+    const conv = this.convs.find((c) => c.id === convId);
+    if (!conv) throw new Error("Esa conversación ya no existe.");
+    if (this.children.has(convId)) throw new Error("Esperá a que termine la respuesta anterior.");
     const user: ChatMessage = { id: randomUUID(), role: "user", text, at: Date.now() };
-    await this.append(user);
+    await this.history(convId);
+    await this.append(convId, user);
+    // El primer mensaje le pone nombre a un hilo nuevo.
+    if (!conv.daily && conv.title === "Conversación nueva") conv.title = text.replace(/\s+/g, " ").trim().slice(0, 48);
+    conv.updatedAt = Date.now();
+    void this.saveIndex();
 
-    const day = dayKey();
-    const resume = this.sessions[day];
-    let reply = await this.run(text, resume ?? randomUUID(), Boolean(resume));
-    // Si la sesión del día ya no existe (se borró la caché de Claude Code), se empieza otra.
-    if (reply.missingSession) reply = await this.run(text, randomUUID(), false);
-    await this.append(reply.message);
-    this.opts.emit({ type: "done", message: reply.message });
+    let reply: { message: ChatMessage; missingSession: boolean };
+    if (conv.daily) {
+      const day = dayKey();
+      const resume = this.sessions[day];
+      reply = await this.run(convId, text, resume ?? randomUUID(), Boolean(resume));
+      // Si la sesión del día ya no existe (se borró la caché de Claude Code), se empieza otra.
+      if (reply.missingSession) reply = await this.run(convId, text, randomUUID(), false);
+    } else {
+      conv.sessionId ??= randomUUID();
+      reply = await this.run(convId, text, conv.sessionId, Boolean(conv.started));
+      if (reply.missingSession) {
+        conv.sessionId = randomUUID();
+        reply = await this.run(convId, text, conv.sessionId, false);
+      }
+      conv.started = true;
+      void this.saveIndex();
+    }
+    await this.append(convId, reply.message);
+    this.emit(convId, { type: "done", message: reply.message });
   }
 
   private async run(
+    convId: string,
     text: string,
     sessionId: string,
     resume: boolean,
   ): Promise<{ message: ChatMessage; missingSession: boolean }> {
     const messageId = randomUUID();
-    this.opts.emit({ type: "start", messageId });
+    this.emit(convId, { type: "start", messageId });
     const fail = (t: string): { message: ChatMessage; missingSession: boolean } => ({
       message: { id: messageId, role: "assistant", text: t, at: Date.now(), error: true },
       missingSession: false,
@@ -292,9 +395,10 @@ export class Assistant {
     ];
 
     return new Promise((resolve) => {
-      const env = { ...cmd.env, RT_BRIDGE: this.bridge.url, RT_TOKEN: this.bridge.token };
+      const env = { ...cmd.env, RT_BRIDGE: this.bridge.url, RT_TOKEN: this.bridge.token, RT_CONV: convId };
       const child = spawn(cmd.bin, args, { cwd: this.dir, env, stdio: ["pipe", "pipe", "pipe"] });
-      this.child = child;
+      this.children.set(convId, child);
+      this.changed();
       // El prompt va por stdin: --allowedTools y --disallowedTools se comerían un argumento suelto.
       child.stdin.end(text);
 
@@ -334,14 +438,14 @@ export class Assistant {
               const delta = (needsBreak ? "\n\n" : "") + m.event.delta.text;
               needsBreak = false;
               full += delta;
-              this.opts.emit({ type: "text", messageId, delta });
+              this.emit(convId, { type: "text", messageId, delta });
             }
           } else if (m.type === "assistant") {
             for (const c of m.message?.content ?? []) {
               if (c.type === "tool_use" && c.name) {
                 const label = toolLabel(c.name);
                 if (!tools.includes(label)) tools.push(label);
-                this.opts.emit({ type: "tool", messageId, label });
+                this.emit(convId, { type: "tool", messageId, label });
               }
             }
           } else if (m.type === "result") {
@@ -353,11 +457,12 @@ export class Assistant {
 
       child.on("close", () => {
         clearTimeout(timer);
-        this.child = null;
+        this.children.delete(convId);
+        this.changed();
         const missing = resume && /no conversation found|session.*not found/i.test(stderr + (resultText ?? ""));
         if (missing) return resolve({ ...fail(""), missingSession: true });
         // La sesión existe desde que Claude arrancó; si no, el próximo --resume cae en "missing" y se rehace.
-        void this.saveSession(dayKey(), sessionId);
+        if (this.convs.find((c) => c.id === convId)?.daily) void this.saveSession(dayKey(), sessionId);
         const textOut = full.trim() || resultText?.trim() || "";
         if (!textOut) {
           const why = isError ? resultText : stderr.trim().split("\n").slice(-3).join(" ");
@@ -371,15 +476,17 @@ export class Assistant {
     });
   }
 
-  private async requestApproval(args: Record<string, unknown>): Promise<unknown> {
+  private async requestApproval(args: Record<string, unknown>, conv: string): Promise<unknown> {
     const tool = String(args.tool_name ?? "");
     const input = (args.input ?? {}) as Record<string, unknown>;
     const request: ApprovalRequest = { id: randomUUID(), tool, summary: describe(tool, input), input };
     const approved = await new Promise<boolean>((resolve) => {
-      this.approvals.set(request.id, resolve);
-      this.opts.emit({ type: "approval", request });
+      this.approvals.set(request.id, { conv, resolve });
+      this.emit(conv, { type: "approval", request });
     });
-    void this.addEvent(`${approved ? "✅ Aprobado" : "🚫 Rechazado"}: ${request.summary.split("\n")[0]}`);
+    const message: ChatMessage = { id: randomUUID(), role: "event", text: `${approved ? "✅ Aprobado" : "🚫 Rechazado"}: ${request.summary.split("\n")[0]}`, at: Date.now() };
+    await this.append(conv, message);
+    this.emit(conv, { type: "event", message });
     return approved
       ? { behavior: "allow", updatedInput: input }
       : { behavior: "deny", message: "El usuario no lo aprobó. No lo vuelvas a intentar; preguntale qué cambiar." };
@@ -391,9 +498,14 @@ export class Assistant {
     await writeFile(join(this.dir, "sesiones.json"), JSON.stringify(this.sessions, null, 2));
   }
 
-  private async append(message: ChatMessage): Promise<void> {
+  private async append(convId: string, message: ChatMessage): Promise<void> {
     if (message.role === "assistant" && !message.text) return;
-    this.history = [...this.history, message].slice(-HISTORY_LIMIT);
-    await appendFile(join(this.dir, "chat.jsonl"), `${JSON.stringify(message)}\n`);
+    const history = await this.history(convId);
+    this.histories.set(convId, [...history, message].slice(-HISTORY_LIMIT));
+    await appendFile(this.file(convId), `${JSON.stringify(message)}\n`);
+  }
+
+  private async saveIndex(): Promise<void> {
+    await writeFile(join(this.dir, "conversaciones.json"), JSON.stringify(this.convs, null, 2));
   }
 }

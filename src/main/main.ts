@@ -120,9 +120,13 @@ bridge.on("contexto_actual", async () => {
   };
 });
 
-ipcMain.handle("chat:history", () => assistant.recent());
-ipcMain.handle("chat:send", (_e, text: string) => assistant.send(text));
-ipcMain.on("chat:stop", () => assistant.stop());
+ipcMain.handle("chat:list", () => assistant.list());
+ipcMain.handle("chat:new", () => assistant.create());
+ipcMain.handle("chat:rename", (_e, convId: string, title: string) => assistant.rename(convId, title));
+ipcMain.handle("chat:delete", (_e, convId: string) => assistant.remove(convId));
+ipcMain.handle("chat:history", (_e, convId: string) => assistant.history(convId));
+ipcMain.handle("chat:send", (_e, convId: string, text: string) => assistant.send(convId, text));
+ipcMain.on("chat:stop", (_e, convId: string) => assistant.stop(convId));
 ipcMain.on("chat:approve", (_e, id: string, approved: boolean) => assistant.approve(id, approved));
 
 ipcMain.handle("calendar:get", () => calendar.current);

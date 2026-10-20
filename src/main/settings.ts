@@ -14,7 +14,7 @@ const DEFAULTS: Settings = {
   tickets: { enabled: true, server: null },
   muted: false,
   speak: false,
-  assistant: { model: "sonnet" },
+  assistant: { model: "sonnet", voice: null, rate: 1.05 },
   terminal: { paths: [], recent: [] },
 };
 

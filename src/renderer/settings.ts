@@ -1,6 +1,7 @@
 // Ventana de configuración (⚙ en la barra de título o ⌘,). Cada cambio se guarda al instante.
 import type { BrowserInfo, PomodoroSound, RailwayProject, RollertermApi, Settings } from "../shared/types";
 import { bell, tick } from "./sound";
+import { preview, spanishVoices, voiceQuality } from "./speech";
 
 export type SettingsSection = "railway" | "tickets" | "assistant";
 
@@ -41,12 +42,20 @@ export function mountSettings(
     </section>
     <section data-section="assistant">
       <h3>Asistente</h3>
-      <p class="settings-help">El chat de la jornada (💬). El historial y la memoria quedan en tu Mac.</p>
+      <p class="settings-help">El chat de la jornada (✦ Asistente). El historial y la memoria quedan en tu Mac.</p>
       <label>Modelo <select class="as-model">
         <option value="sonnet">Sonnet — equilibrado (recomendado)</option>
         <option value="opus">Opus — más capaz, más lento</option>
         <option value="haiku">Haiku — más rápido y liviano</option>
       </select></label>
+      <label>Voz <select class="as-voice-select"></select></label>
+      <label>Velocidad <input type="range" class="as-rate" min="0.7" max="1.6" step="0.05" /> <span class="as-rate-value"></span></label>
+      <div class="settings-actions">
+        <button class="as-voice-test">Escuchar</button>
+      </div>
+      <p class="settings-help as-voice-tip">Las voces <b>mejoradas</b> o <b>premium</b> suenan mucho más naturales. Se bajan gratis en
+        Configuración del Sistema → Accesibilidad → Contenido leído → Voz del sistema → Administrar voces → Español
+        (por ejemplo «Mónica (mejorada)» o «Paulina (premium)»). Después de bajarlas, reabrí la app.</p>
     </section>
     <section data-section="tickets">
       <h3>Tickets (Pxsol Agencias)</h3>
@@ -80,6 +89,9 @@ export function mountSettings(
   let railwayProjects: RailwayProject[] = [];
   let mcpServers: string[] = [];
   const asModel = $<HTMLSelectElement>(".as-model");
+  const asVoice = $<HTMLSelectElement>(".as-voice-select");
+  const asRate = $<HTMLInputElement>(".as-rate");
+  const asRateValue = $<HTMLSpanElement>(".as-rate-value");
   const tkEnabled = $<HTMLInputElement>(".tk-enabled");
   const tkServer = $<HTMLSelectElement>(".tk-server");
   /** false hasta la primera respuesta: lista vacía no significa "no hay proyectos" todavía. */
@@ -117,6 +129,18 @@ export function mountSettings(
     volumeRange.value = String(settings.pomodoro.volume);
 
     asModel.value = settings.assistant.model;
+    const voices = spanishVoices();
+    const tag = { premium: " ✦ mejorada", normal: "", personaje: " (de personaje)" } as const;
+    asVoice.replaceChildren(
+      option("", voices[0] ? `Automática (${voices[0].name})` : "Automática"),
+      ...voices.map((v) => option(v.name, `${v.name} · ${v.lang}${tag[voiceQuality(v)]}`)),
+    );
+    const chosen = settings.assistant.voice;
+    asVoice.value = voices.some((v) => v.name === chosen) ? (chosen as string) : "";
+    asRate.value = String(settings.assistant.rate);
+    asRateValue.textContent = `${settings.assistant.rate.toFixed(2)}×`;
+    // El consejo de bajar voces mejores, solo si todavía no hay ninguna.
+    $<HTMLParagraphElement>(".as-voice-tip").hidden = voices.some((v) => voiceQuality(v) === "premium");
     tkEnabled.checked = settings.tickets.enabled;
     $<HTMLLabelElement>(".tk-server-row").hidden = !settings.tickets.enabled;
     tkServer.replaceChildren(option("", "Automático (el primero de tickets)"), ...mcpServers.map((n) => option(n, n)));
@@ -192,7 +216,12 @@ export function mountSettings(
 
   $<HTMLButtonElement>(".rw-all").addEventListener("click", () => void save({ railway: { enabled: true, projects: null } }));
   $<HTMLButtonElement>(".rw-none").addEventListener("click", () => void save({ railway: { enabled: true, projects: [] } }));
-  asModel.addEventListener("change", () => void save({ assistant: { model: asModel.value } }));
+  asModel.addEventListener("change", () => void save({ assistant: { ...settings!.assistant, model: asModel.value } }));
+  asVoice.addEventListener("change", () => void save({ assistant: { ...settings!.assistant, voice: asVoice.value || null } }));
+  asRate.addEventListener("input", () => (asRateValue.textContent = `${Number(asRate.value).toFixed(2)}×`));
+  asRate.addEventListener("change", () => void save({ assistant: { ...settings!.assistant, rate: Number(asRate.value) } }));
+  $<HTMLButtonElement>(".as-voice-test").addEventListener("click", () => preview());
+  speechSynthesis.addEventListener("voiceschanged", () => dialog.open && render());
   tkEnabled.addEventListener("change", () => void save({ tickets: { enabled: tkEnabled.checked, server: settings!.tickets.server } }));
   tkServer.addEventListener("change", () => void save({ tickets: { enabled: true, server: tkServer.value || null } }));
   rwEnabled.addEventListener("change", () => {

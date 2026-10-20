@@ -83,9 +83,14 @@ export interface RollertermApi {
   listNotes(): Promise<Note[]>;
   saveNote(note: Note): Promise<void>;
   deleteNote(id: string): Promise<void>;
-  chatHistory(): Promise<ChatMessage[]>;
-  chatSend(text: string): Promise<void>;
-  chatStop(): void;
+  /** Las conversaciones del asistente (la de la jornada primero). */
+  chatList(): Promise<Conversation[]>;
+  chatNew(): Promise<Conversation>;
+  chatRename(convId: string, title: string): Promise<void>;
+  chatDelete(convId: string): Promise<void>;
+  chatHistory(convId: string): Promise<ChatMessage[]>;
+  chatSend(convId: string, text: string): Promise<void>;
+  chatStop(convId: string): void;
   chatApprove(id: string, approved: boolean): void;
   onChat(cb: (event: ChatStreamEvent) => void): void;
   /** Avisa que las notas cambiaron desde afuera del panel (por ejemplo, las creó el asistente). */
@@ -371,15 +376,32 @@ export interface ApprovalRequest {
   input: Record<string, unknown>;
 }
 
-/** Eventos de una respuesta en curso, para pintarla mientras llega. */
-export type ChatStreamEvent =
+/**
+ * Una conversación del asistente. La «Jornada» (daily) retoma una sesión de Claude por día;
+ * las demás son hilos aparte que siguen siempre la misma sesión. Pueden responder a la vez.
+ */
+export interface Conversation {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  daily: boolean;
+  /** Respondiendo ahora. */
+  busy: boolean;
+}
+
+/** Eventos de una respuesta en curso, para pintarla mientras llega. Todos dicen de qué conversación son. */
+export type ChatStreamEvent = { convId: string } & (
   | { type: "start"; messageId: string }
   | { type: "text"; messageId: string; delta: string }
   | { type: "tool"; messageId: string; label: string }
   | { type: "approval"; request: ApprovalRequest }
   | { type: "approval-done"; id: string; approved: boolean }
   | { type: "done"; message: ChatMessage }
-  | { type: "event"; message: ChatMessage };
+  | { type: "event"; message: ChatMessage }
+  /** Cambió la lista (nueva, renombrada, borrada, empezó o terminó de responder). */
+  | { type: "conversations"; list: Conversation[] }
+);
 
 export interface Reminder {
   id: string;
@@ -392,4 +414,8 @@ export interface Reminder {
 export interface AssistantSettings {
   /** Alias de modelo de Claude Code: "sonnet", "opus", "haiku". */
   model: string;
+  /** Nombre de la voz de macOS con la que lee; null = la mejor en español que haya. */
+  voice: string | null;
+  /** Velocidad de lectura (1 = normal). */
+  rate: number;
 }
