@@ -682,7 +682,7 @@ pre.detail[hidden] { display: none; }
 #settings label.check { justify-content: flex-start; gap: 8px; }
 #settings input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
 #settings input[type="range"] { flex: 1; max-width: 320px; accent-color: var(--accent); }
-.pomo-test { height: 24px; padding: 0 12px; border: 1px solid #ffffff26; border-radius: 4px; background: transparent; color: var(--text); font: inherit; }
+.pomo-test, .as-voice-test { height: 24px; padding: 0 12px; border: 1px solid #ffffff26; border-radius: 4px; background: transparent; color: var(--text); font: inherit; }
 .pomo-test:hover { background: #ffffff1a; }
 /* Importantes: el remitente siempre en amarillo, leído o no. */
 .mail-thread.vip .mt-from { color: #d9a441; }
@@ -925,6 +925,7 @@ pre.detail[hidden] { display: none; }
 .notes-new,
 .browser-test,
 .pomo-test,
+.as-voice-test,
 #pomodoro:not([data-phase="idle"]):not(.paused) > .pomo-display {
   border: 2px solid transparent !important;
   border-radius: 999px !important;
@@ -941,6 +942,7 @@ pre.detail[hidden] { display: none; }
 .notes-new:hover,
 .browser-test:hover,
 .pomo-test:hover,
+.as-voice-test:hover,
 #pomodoro:not([data-phase="idle"]):not(.paused) > .pomo-display:hover {
   filter: brightness(1.2);
 }
@@ -954,7 +956,7 @@ pre.detail[hidden] { display: none; }
 @keyframes rgb-flow-single { to { background-position: 300% 0; } }
 @keyframes rgb-flow-vertical { to { background-position: 0 300%; } }
 @media (prefers-reduced-motion: reduce) {
-  .ev-join, .mail-summarize, .notes-new, .browser-test, .pomo-test, .tab.active::before, #titlebar::after,
+  .ev-join, .mail-summarize, .notes-new, .browser-test, .pomo-test, .as-voice-test, .tab.active::before, #titlebar::after,
   #pomodoro > .pomo-display, #toggle-assistant.busy, #toggle-assistant.busy .ta-icon, .as-conv.busy { animation: none !important; }
 }
 
