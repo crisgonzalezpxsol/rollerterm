@@ -2,6 +2,7 @@
 // Abiertos, una tabla ordenada por urgencia, y avisos de lo nuevo que te asignan.
 import type { RollertermApi, Ticket, TicketPriority, TicketsState, TicketStatus } from "../shared/types";
 import { fmtTime } from "./connector";
+import { showContextMenu } from "./context-menu";
 import { notify } from "./notify";
 
 type Tab = "mine" | "unassigned" | "all";
@@ -30,7 +31,13 @@ function byUrgency(a: Ticket, b: Ticket): number {
   );
 }
 
-export function mountTickets(root: HTMLElement, api: RollertermApi, openTicket: (t: Pick<Ticket, "numero" | "asunto">) => void): void {
+type TicketRef = Pick<Ticket, "numero" | "asunto">;
+
+export function mountTickets(
+  root: HTMLElement,
+  api: RollertermApi,
+  hooks: { open: (t: TicketRef) => void; openInTerminal: (t: TicketRef) => void },
+): void {
   root.classList.add("panel");
   root.innerHTML = `
     <div class="panel-head">
@@ -135,7 +142,7 @@ export function mountTickets(root: HTMLElement, api: RollertermApi, openTicket: 
     known = { mine, sla };
   }
 
-  const open = (t: Pick<Ticket, "numero" | "asunto">) => openTicket(t);
+  const open = (t: TicketRef) => hooks.open(t);
 
   function render() {
     if (!state) return;
@@ -207,8 +214,17 @@ export function mountTickets(root: HTMLElement, api: RollertermApi, openTicket: 
   function renderRow(t: Ticket): HTMLTableRowElement {
     const tr = document.createElement("tr");
     tr.classList.toggle("sla", t.slaVencido);
-    tr.title = "Ver el ticket completo";
+    tr.title = "Clic: ver el ticket completo · clic derecho: más opciones";
     tr.addEventListener("click", () => open(t));
+    tr.addEventListener("contextmenu", (e) => {
+      showContextMenu(e, [
+        { header: `#${t.numero}` },
+        { label: "Abrir en una terminal nueva", action: () => hooks.openInTerminal(t) },
+        { label: "Ver el ticket", action: () => open(t) },
+        ...(state?.webUrl ? [{ label: "Abrir en la web ↗", action: () => window.open(`${state!.webUrl}/tickets?q=${t.numero}`) }] : []),
+        { label: "Copiar número", action: () => void navigator.clipboard.writeText(`#${t.numero}`) },
+      ]);
+    });
     const cell = (text: string, cls?: string) => {
       const td = document.createElement("td");
       if (cls) td.className = cls;

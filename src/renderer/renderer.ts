@@ -3,9 +3,10 @@ import "./styles.css";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import type { MenuCommand, Session, RollertermApi, Settings } from "../shared/types";
+import type { MenuCommand, Session, RollertermApi, Settings, TabSector, Ticket } from "../shared/types";
 import { mountAgenda } from "./agenda";
 import { mountAssistant } from "./assistant";
+import { showContextMenu, type MenuItem } from "./context-menu";
 import { mountTicketView } from "./ticket-view";
 import { mountMail } from "./mail";
 import { mountNotes } from "./notes";
@@ -33,6 +34,8 @@ interface Tab {
   pane: HTMLDivElement;
   tabEl: HTMLDivElement;
   labelEl: HTMLSpanElement;
+  /** Sector de la columna lateral; null = suelta. */
+  sectorId: string | null;
   /** false cuando la shell terminó: la pestaña queda con su nombre y Enter la reabre. */
   alive: boolean;
 }
@@ -63,7 +66,10 @@ const pomodoro = mountPomodoro(
 mountAgenda(document.getElementById("agenda") as HTMLElement, api);
 mountMail(document.getElementById("mail") as HTMLElement, api);
 const ticketView = mountTicketView(api, { onClose: () => active?.term.focus() });
-mountTickets(document.getElementById("tickets") as HTMLElement, api, (t) => ticketView.open(t));
+mountTickets(document.getElementById("tickets") as HTMLElement, api, {
+  open: (t) => ticketView.open(t),
+  openInTerminal: (t) => void openTicketTerminal(t),
+});
 const notesPanel = mountNotes(api, () => active?.term.focus());
 // Un panel lateral a la vez: abrir el chat cierra las notas y al revés.
 const assistantPanel = mountAssistant(api, { onOpen: () => notesPanel.close(), onClose: () => active?.term.focus() });
@@ -83,6 +89,7 @@ const pathPicker = mountPathPicker(api, { settings: () => settings, onChange: ap
 
 let tabs: Tab[] = [];
 let active: Tab | null = null;
+let sectors: TabSector[] = [];
 let counter = 0;
 
 // ---------- persistencia ----------
@@ -92,8 +99,9 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     const session: Session = {
-      tabs: tabs.map(({ id, name, cwd }) => ({ id, name, cwd })),
+      tabs: tabs.map(({ id, name, cwd, sectorId }) => ({ id, name, cwd, sectorId })),
       activeId: active?.id ?? null,
+      sectors,
     };
     api.saveSession(session).catch((err) => console.error("[saveSession]", err));
   }, 300);
@@ -107,7 +115,7 @@ function startShell(tab: Tab) {
   return api.createPty(tab.id, tab.cwd, tab.term.cols, tab.term.rows);
 }
 
-function createTab(opts: { id?: string; name?: string; cwd?: string } = {}, focus = true): Tab {
+function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: string | null } = {}, focus = true): Tab {
   counter += 1;
   const id = opts.id ?? crypto.randomUUID();
 
@@ -152,11 +160,13 @@ function createTab(opts: { id?: string; name?: string; cwd?: string } = {}, focu
   closeBtn.textContent = "×";
   closeBtn.title = "Cerrar (⌘W)";
   tabEl.append(textEl, closeBtn);
-  tabsEl.appendChild(tabEl);
 
-  const tab: Tab = { id, name: opts.name ?? `Terminal ${counter}`, cwd: opts.cwd ?? "", term, fit, pane, tabEl, labelEl, alive: false };
+  // Un sector que ya no existe (se borró en otra sesión) deja la pestaña suelta.
+  const sectorId = sectors.some((x) => x.id === opts.sectorId) ? opts.sectorId! : null;
+  const tab: Tab = { id, name: opts.name ?? `Terminal ${counter}`, cwd: opts.cwd ?? "", term, fit, pane, tabEl, labelEl, sectorId, alive: false };
   setName(tab, tab.name);
   tabs.push(tab);
+  renderTabList();
 
   term.onData((data) => {
     if (tab.alive) api.write(tab.id, data);
@@ -172,6 +182,7 @@ function createTab(opts: { id?: string; name?: string; cwd?: string } = {}, focu
     else if (e.target !== closeBtn) activate(tab);
   });
   labelEl.addEventListener("dblclick", () => startRename(tab));
+  tabEl.addEventListener("contextmenu", (e) => showContextMenu(e, tabMenu(tab)));
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     closeTab(tab);
@@ -191,6 +202,11 @@ function activate(tab: Tab, focus = true) {
     active.tabEl.classList.remove("active");
   }
   active = tab;
+  const sector = sectors.find((x) => x.id === tab.sectorId);
+  if (sector?.collapsed) {
+    sector.collapsed = false;
+    renderTabList();
+  }
   tab.pane.classList.add("active");
   tab.tabEl.classList.add("active");
   tab.tabEl.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -201,18 +217,22 @@ function activate(tab: Tab, focus = true) {
 }
 
 function closeTab(tab: Tab) {
-  const idx = tabs.indexOf(tab);
+  const order = visualOrder();
+  const idx = order.indexOf(tab);
   api.kill(tab.id);
   tab.term.dispose();
   tab.pane.remove();
   tab.tabEl.remove();
-  tabs.splice(idx, 1);
+  tabs.splice(tabs.indexOf(tab), 1);
+  renderTabList();
   if (tabs.length === 0) {
     active = null;
     createDefaultTab();
     return;
   }
-  if (active === tab) activate(tabs[Math.min(idx, tabs.length - 1)]);
+  // La que queda al lado en la columna (no la que sigue en el orden de creación).
+  order.splice(idx, 1);
+  if (active === tab) activate(order[Math.min(idx, order.length - 1)]);
   scheduleSave();
 }
 
@@ -233,6 +253,16 @@ async function newTab() {
   const cwd = await pathPicker.pick();
   if (cwd) createTab({ cwd, name: baseName(cwd) });
   else active?.term.focus();
+}
+
+/** Pestaña para trabajar un ticket: se llama "#381 Asunto" y va al sector de tickets si lo hay. */
+async function openTicketTerminal(t: Pick<Ticket, "numero" | "asunto">) {
+  const existing = tabs.find((x) => new RegExp(`^#?${t.numero}\\b`).test(x.name));
+  if (existing) return activate(existing);
+  const cwd = await pathPicker.pick();
+  if (!cwd) return active?.term.focus();
+  const sector = sectors.find((x) => /ticket/i.test(x.name));
+  createTab({ cwd, name: `#${t.numero} ${t.asunto}`.trim(), sectorId: sector?.id ?? null });
 }
 
 /** Sin preguntar: en la ruta por defecto (la primera guardada) o en el home. */
@@ -375,26 +405,218 @@ function startRename(tab: Tab) {
   input.addEventListener("blur", () => finish(true));
 }
 
+// ---------- sectores (grupos de pestañas) ----------
+
+const DEFAULT_SECTORS = ["Tickets", "En espera", "Leer luego"];
+
+/** Las pestañas en el orden en que se ven: primero las sueltas, después cada sector. */
+function visualOrder(): Tab[] {
+  return [null, ...sectors.map((x) => x.id)].flatMap((id) => tabs.filter((t) => t.sectorId === id));
+}
+
+/** Rearma la columna con los nodos de siempre (moverlos no reinicia nada). */
+function renderTabList() {
+  const loose = document.createElement("div");
+  loose.className = "tab-group loose";
+  wireDropZone(loose, null);
+  loose.append(...tabs.filter((t) => t.sectorId === null).map((t) => t.tabEl));
+
+  const blocks = sectors.map((sector) => {
+    const block = document.createElement("section");
+    block.className = "sector";
+    block.classList.toggle("collapsed", sector.collapsed);
+    const members = tabs.filter((t) => t.sectorId === sector.id);
+    const head = document.createElement("div");
+    head.className = "sector-head";
+    head.title = "Clic: plegar / desplegar · doble clic: renombrar · clic derecho: más opciones";
+    const chevron = document.createElement("span");
+    chevron.className = "sector-chevron";
+    chevron.textContent = "›";
+    const name = document.createElement("span");
+    name.className = "sector-name";
+    name.textContent = sector.name;
+    const count = document.createElement("span");
+    count.className = "sector-count";
+    count.textContent = members.length ? String(members.length) : "";
+    head.append(chevron, name, count);
+    head.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
+      sector.collapsed = !sector.collapsed;
+      renderTabList();
+      scheduleSave();
+    });
+    name.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      renameSector(sector, name);
+    });
+    head.addEventListener("contextmenu", (e) => showContextMenu(e, sectorMenu(sector, name)));
+    wireDropZone(head, sector.id);
+    const list = document.createElement("div");
+    list.className = "tab-group";
+    wireDropZone(list, sector.id);
+    if (!members.length) {
+      const empty = document.createElement("div");
+      empty.className = "sector-empty";
+      empty.textContent = "Arrastrá pestañas acá";
+      list.append(empty);
+    }
+    list.append(...members.map((t) => t.tabEl));
+    block.append(head, list);
+    return { block, name, sector };
+  });
+
+  const add = document.createElement("button");
+  add.className = "sector-add";
+  add.textContent = "+ Nuevo sector";
+  add.title = "Un grupo para apartar pestañas: tickets, en espera, para leer luego…";
+  add.addEventListener("click", () => newSector());
+  tabsEl.replaceChildren(loose, ...blocks.map((b) => b.block), add);
+  return blocks;
+}
+
+function moveToSector(tab: Tab, sectorId: string | null) {
+  if (tab.sectorId === sectorId) return;
+  tab.sectorId = sectorId;
+  // Al final del sector nuevo.
+  tabs.splice(tabs.indexOf(tab), 1);
+  tabs.push(tab);
+  renderTabList();
+  scheduleSave();
+}
+
+/** Crea un sector y deja el nombre listo para escribir; si viene una pestaña, la mueve ahí. */
+function newSector(tab?: Tab) {
+  const sector: TabSector = { id: crypto.randomUUID(), name: "Sector nuevo", collapsed: false };
+  sectors.push(sector);
+  if (tab) tab.sectorId = sector.id;
+  const block = renderTabList().find((b) => b.sector === sector);
+  scheduleSave();
+  if (block) renameSector(sector, block.name);
+}
+
+function renameSector(sector: TabSector, nameEl: HTMLElement) {
+  const input = document.createElement("input");
+  input.value = sector.name;
+  nameEl.replaceWith(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = (commit: boolean) => {
+    if (done) return;
+    done = true;
+    const value = input.value.trim();
+    if (commit && value) sector.name = value;
+    renderTabList();
+    scheduleSave();
+    active?.term.focus();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") finish(true);
+    else if (e.key === "Escape") finish(false);
+    e.stopPropagation();
+  });
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("blur", () => finish(true));
+}
+
+function deleteSector(sector: TabSector) {
+  const members = tabs.filter((t) => t.sectorId === sector.id);
+  if (members.length && !confirm(`¿Borrar el sector «${sector.name}»? Sus ${members.length} pestañas quedan sueltas, no se cierran.`)) return;
+  for (const t of members) t.sectorId = null;
+  sectors = sectors.filter((x) => x !== sector);
+  renderTabList();
+  scheduleSave();
+}
+
+function moveSector(sector: TabSector, delta: number) {
+  const i = sectors.indexOf(sector);
+  const j = i + delta;
+  if (j < 0 || j >= sectors.length) return;
+  sectors.splice(i, 1);
+  sectors.splice(j, 0, sector);
+  renderTabList();
+  scheduleSave();
+}
+
+function sectorMenu(sector: TabSector, nameEl: HTMLElement): MenuItem[] {
+  const i = sectors.indexOf(sector);
+  return [
+    { label: "Renombrar", action: () => renameSector(sector, nameEl) },
+    { label: sector.collapsed ? "Desplegar" : "Plegar", action: () => ((sector.collapsed = !sector.collapsed), renderTabList(), scheduleSave()) },
+    { label: "Subir", action: () => moveSector(sector, -1), disabled: i === 0 },
+    { label: "Bajar", action: () => moveSector(sector, 1), disabled: i === sectors.length - 1 },
+    "-",
+    { label: "Nuevo sector", action: () => newSector() },
+    { label: "Borrar sector", action: () => deleteSector(sector), danger: true },
+  ];
+}
+
+function tabMenu(tab: Tab): MenuItem[] {
+  return [
+    { label: "Renombrar", action: () => startRename(tab) },
+    "-",
+    { header: "Mover a" },
+    { label: "Sin sector", action: () => moveToSector(tab, null), checked: tab.sectorId === null },
+    ...sectors.map((x): MenuItem => ({ label: x.name, action: () => moveToSector(tab, x.id), checked: tab.sectorId === x.id })),
+    { label: "Sector nuevo…", action: () => newSector(tab) },
+    "-",
+    { label: "Cerrar", action: () => closeTab(tab), danger: true },
+  ];
+}
+
 // ---------- reordenar arrastrando ----------
 
 let dragging: Tab | null = null;
 function wireDrag(tab: Tab) {
   const el = tab.tabEl;
-  el.addEventListener("dragstart", () => (dragging = tab));
-  el.addEventListener("dragend", () => (dragging = null));
+  el.addEventListener("dragstart", () => {
+    dragging = tab;
+    tabsEl.classList.add("dragging");
+  });
+  el.addEventListener("dragend", () => {
+    dragging = null;
+    tabsEl.classList.remove("dragging");
+  });
   el.addEventListener("dragover", (e) => {
     if (!dragging || dragging === tab) return;
     e.preventDefault();
+    e.stopPropagation();
     el.classList.add("drag-over");
   });
   el.addEventListener("dragleave", () => el.classList.remove("drag-over"));
   el.addEventListener("drop", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     el.classList.remove("drag-over");
     if (!dragging || dragging === tab) return;
+    // Queda arriba de la pestaña donde se soltó, en su mismo sector.
+    dragging.sectorId = tab.sectorId;
     tabs.splice(tabs.indexOf(dragging), 1);
     tabs.splice(tabs.indexOf(tab), 0, dragging);
-    tabsEl.insertBefore(dragging.tabEl, el);
+    renderTabList();
+    scheduleSave();
+  });
+}
+
+/** Soltar en un sector (encabezado o hueco) o en la zona de sueltas manda la pestaña al final. */
+function wireDropZone(el: HTMLElement, sectorId: string | null) {
+  el.addEventListener("dragover", (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    el.classList.add("drop-target");
+  });
+  el.addEventListener("dragleave", (e) => {
+    if (!el.contains(e.relatedTarget as Node)) el.classList.remove("drop-target");
+  });
+  el.addEventListener("drop", (e) => {
+    e.preventDefault();
+    el.classList.remove("drop-target");
+    if (!dragging) return;
+    const tab = dragging;
+    tab.sectorId = sectorId;
+    tabs.splice(tabs.indexOf(tab), 1);
+    tabs.push(tab);
+    renderTabList();
     scheduleSave();
   });
 }
@@ -412,7 +634,8 @@ api.onExit((id, code) => {
 });
 
 api.onMenu((cmd: MenuCommand) => {
-  const idx = active ? tabs.indexOf(active) : -1;
+  const order = visualOrder();
+  const idx = active ? order.indexOf(active) : -1;
   if (cmd === "new-tab") void newTab();
   // Con las notas abiertas, ⌘W las cierra en vez de cerrar la pestaña de la terminal.
   else if (cmd === "close-tab" && notesPanel.isOpen) notesPanel.close();
@@ -423,22 +646,23 @@ api.onMenu((cmd: MenuCommand) => {
   else if (cmd === "toggle-terminal-max") toggleMax();
   else if (cmd === "close-tab" && active) closeTab(active);
   else if (cmd === "rename-tab" && active) startRename(active);
-  else if (cmd === "next-tab" && tabs.length) activate(tabs[(idx + 1) % tabs.length]);
+  else if (cmd === "next-tab" && order.length) activate(order[(idx + 1) % order.length]);
   else if (cmd === "pomodoro-toggle") pomodoro.toggle();
   else if (cmd === "pomodoro-reset") pomodoro.reset();
   else if (cmd === "open-settings") void settingsPanel.open();
-  else if (cmd === "prev-tab" && tabs.length) activate(tabs[(idx - 1 + tabs.length) % tabs.length]);
+  else if (cmd === "prev-tab" && order.length) activate(order[(idx - 1 + order.length) % order.length]);
   else if (cmd.startsWith("goto-tab:")) {
     const n = Number(cmd.split(":")[1]);
     // ⌘9 va a la última, como en el navegador.
-    const target = n === 8 ? tabs[tabs.length - 1] : tabs[n];
+    const target = n === 8 ? order[order.length - 1] : order[n];
     if (target) activate(target);
   }
 });
 
 newTabBtn.addEventListener("click", () => void newTab());
 tabsEl.addEventListener("dblclick", (e) => {
-  if (e.target === tabsEl) void newTab(); // doble clic en el hueco de la lista abre una pestaña
+  const el = e.target as HTMLElement;
+  if (el === tabsEl || el.classList.contains("loose")) void newTab(); // doble clic en el hueco de la lista abre una pestaña
 });
 
 new ResizeObserver(() => active?.fit.fit()).observe(panesEl);
@@ -449,6 +673,8 @@ async function boot() {
   const session = await api.loadSession().catch(() => null);
   // La ruta por defecto sale de la configuración: esperarla antes de la primera pestaña.
   if (!settings) applySettings(await api.getSettings());
+  sectors = session?.sectors ?? DEFAULT_SECTORS.map((name) => ({ id: crypto.randomUUID(), name, collapsed: false }));
+  renderTabList();
   if (!session?.tabs.length) {
     createDefaultTab();
     return;

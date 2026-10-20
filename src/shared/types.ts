@@ -4,11 +4,22 @@ export interface SavedTab {
   name: string;
   /** Directorio en el que estaba la shell al cerrar la app ("" = home). */
   cwd: string;
+  /** Sector en el que está; null o ausente = suelta (arriba de los sectores). */
+  sectorId?: string | null;
+}
+
+/** Un grupo de pestañas de la columna lateral ("Tickets", "En espera", "Leer luego"). */
+export interface TabSector {
+  id: string;
+  name: string;
+  collapsed: boolean;
 }
 
 export interface Session {
   tabs: SavedTab[];
   activeId: string | null;
+  /** Ausente en sesiones viejas: se crean los sectores de ejemplo. */
+  sectors?: TabSector[];
 }
 
 /** Comandos que el menú (proceso main) le manda a la ventana. */
