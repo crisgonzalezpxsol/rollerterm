@@ -32,6 +32,21 @@ export class NotesStore {
     await this.persist();
   }
 
+  /** Suma notas importadas: las que ya están se quedan con la versión más nueva. */
+  async merge(incoming: Note[]): Promise<number> {
+    await this.list();
+    let changed = 0;
+    for (const note of incoming) {
+      const i = this.notes!.findIndex((n) => n.id === note.id);
+      if (i < 0) this.notes!.push(note);
+      else if (note.updatedAt > this.notes![i].updatedAt) this.notes![i] = note;
+      else continue;
+      changed++;
+    }
+    if (changed) await this.persist();
+    return changed;
+  }
+
   async delete(id: string): Promise<void> {
     await this.list();
     this.notes = this.notes!.filter((n) => n.id !== id);

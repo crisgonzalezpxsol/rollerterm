@@ -7,6 +7,7 @@ import { CalendarSync } from "./calendar";
 import { ClaudeRunner } from "./claude-runner";
 import { ClaudeUsage } from "./claude-usage";
 import { MailSync } from "./mail";
+import { exportConfig, importConfig } from "./config-io";
 import { NotesStore } from "./notes";
 import { listMcpServers } from "./mcp-client";
 import { resolveServer } from "./tickets";
@@ -56,6 +57,19 @@ ipcMain.handle("settings:set", async (_e, patch) => {
 ipcMain.handle("notes:list", () => notes.list());
 ipcMain.handle("notes:save", (_e, note) => notes.save(note));
 ipcMain.handle("notes:delete", (_e, id: string) => notes.delete(id));
+ipcMain.handle("reminders:list", () => reminders.all());
+ipcMain.handle("reminders:add", (_e, when: string, text: string, noteId?: string) => reminders.add(when, text, noteId));
+ipcMain.handle("reminders:remove", (_e, id: string) => reminders.remove(id));
+ipcMain.handle("config:export", (_e, ui: Record<string, string>) => (win ? exportConfig(win, { settings, mail, notes, reminders }, ui) : null));
+ipcMain.handle("config:import", async () => {
+  if (!win) return null;
+  const result = await importConfig(win, { settings, mail, notes, reminders });
+  if (result) {
+    void prod.check();
+    void tickets.check();
+  }
+  return result;
+});
 ipcMain.handle("tickets:get", () => tickets.current);
 ipcMain.on("tickets:refresh", () => void tickets.check());
 ipcMain.handle("tickets:view", (_e, numero: number) => tickets.view(numero));
@@ -77,27 +91,35 @@ const assistant = new Assistant(claude, bridge, {
   ticketServer: async () => (await resolveServer(settings.current.tickets))?.name ?? null,
   emit: (event) => win?.webContents.send("chat:event", event),
 });
-const reminders = new Reminders((r) => {
-  win?.webContents.send("reminder:fire", r);
-  void assistant.addEvent(`⏰ Recordatorio: ${r.text}`);
-});
+const reminders = new Reminders(
+  (r) => {
+    win?.webContents.send("reminder:fire", r);
+    void assistant.addEvent(`⏰ Recordatorio: ${r.text}`);
+  },
+  () => win?.webContents.send("reminders:changed"),
+);
 
-bridge.on("crear_nota", async ({ texto }) => {
+bridge.on("crear_nota", async ({ texto, cliente, etiquetas }) => {
   const now = Date.now();
-  const note = { id: crypto.randomUUID(), text: String(texto ?? ""), createdAt: now, updatedAt: now };
+  const client = String(cliente ?? "").trim() || undefined;
+  const tags = Array.isArray(etiquetas) ? etiquetas.map((t) => String(t).trim()).filter(Boolean) : [];
+  const note = { id: crypto.randomUUID(), text: String(texto ?? ""), client, tags: tags.length ? tags : undefined, createdAt: now, updatedAt: now };
   await notes.save(note);
   win?.webContents.send("notes:changed");
   return { ok: true, id: note.id };
 });
-bridge.on("buscar_notas", async ({ q }) => {
+bridge.on("buscar_notas", async ({ q, cliente }) => {
   const needle = String(q ?? "").toLowerCase();
+  const client = String(cliente ?? "").trim().toLowerCase();
   const all = await notes.list();
-  return (needle ? all.filter((n) => n.text.toLowerCase().includes(needle)) : all)
+  return all
+    .filter((n) => !client || (n.client ?? "").trim().toLowerCase() === client)
+    .filter((n) => !needle || [n.text, n.client ?? "", ...(n.tags ?? [])].some((s) => s.toLowerCase().includes(needle)))
     .slice(0, 30)
-    .map((n) => ({ texto: n.text, editada: new Date(n.updatedAt).toISOString() }));
+    .map((n) => ({ id: n.id, texto: n.text, cliente: n.client ?? null, etiquetas: n.tags ?? [], editada: new Date(n.updatedAt).toISOString() }));
 });
-bridge.on("crear_recordatorio", async ({ cuando, texto }) => {
-  const r = await reminders.add(String(cuando), String(texto ?? ""));
+bridge.on("crear_recordatorio", async ({ cuando, texto, nota_id }) => {
+  const r = await reminders.add(String(cuando), String(texto ?? ""), nota_id ? String(nota_id) : undefined);
   return { ok: true, id: r.id, cuando: new Date(r.when).toLocaleString("es-AR", { hourCycle: "h23" }) };
 });
 bridge.on("listar_recordatorios", async () =>
@@ -193,6 +215,8 @@ function buildMenu() {
         { role: "about" },
         { type: "separator" },
         { label: "Configuración…", accelerator: "CmdOrCtrl+,", click: () => send("open-settings") },
+        { label: "Exportar configuración…", click: () => send("export-config") },
+        { label: "Importar configuración…", click: () => send("import-config") },
         { type: "separator" },
         { role: "services" },
         { type: "separator" },

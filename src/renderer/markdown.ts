@@ -22,10 +22,15 @@ export function renderMarkdown(text: string): DocumentFragment {
       i++;
       continue;
     }
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(line)) {
+      frag.append(document.createElement("hr"));
+      i++;
+      continue;
+    }
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
     if (heading) {
       const h = document.createElement("p");
-      h.className = "md-h";
+      h.className = `md-h md-h${heading[1].length}`;
       appendInline(h, heading[2]);
       frag.append(h);
       i++;
@@ -48,7 +53,7 @@ export function renderMarkdown(text: string): DocumentFragment {
     // Párrafo: líneas seguidas hasta una vacía o un bloque de otro tipo.
     const p = document.createElement("p");
     const para: string[] = [];
-    while (i < lines.length && lines[i].trim() && !/^```/.test(lines[i]) && !bullet.test(lines[i]) && !numbered.test(lines[i]) && !/^#{1,4}\s/.test(lines[i])) {
+    while (i < lines.length && lines[i].trim() && !/^```/.test(lines[i]) && !bullet.test(lines[i]) && !numbered.test(lines[i]) && !/^#{1,4}\s/.test(lines[i]) && !/^\s*(-{3,}|\*{3,})\s*$/.test(lines[i])) {
       para.push(lines[i++]);
     }
     para.forEach((l, k) => {

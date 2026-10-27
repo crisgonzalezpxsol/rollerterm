@@ -508,7 +508,8 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     }
   });
 
-  api.onReminder((r) => notify("⏰ Recordatorio", r.text, () => reveal("jornada")));
+  // Los de una nota los avisa el panel de notas (el clic abre la nota).
+  api.onReminder((r) => r.noteId || notify("⏰ Recordatorio", r.text, () => reveal("jornada")));
 
   // ---------- enviar ----------
 

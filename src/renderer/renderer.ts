@@ -3,7 +3,7 @@ import "./styles.css";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
-import type { MenuCommand, Session, RollertermApi, Settings, TabSector, Ticket } from "../shared/types";
+import type { MenuCommand, Session, RollertermApi, Settings, TabSector, TabStatus, Ticket } from "../shared/types";
 import { mountAgenda } from "./agenda";
 import { mountAssistant } from "./assistant";
 import { showContextMenu, type MenuItem } from "./context-menu";
@@ -38,6 +38,8 @@ interface Tab {
   labelEl: HTMLSpanElement;
   /** Sector de la columna lateral; null = suelta. */
   sectorId: string | null;
+  status: TabStatus | null;
+  statusEl: HTMLSpanElement;
   /** false cuando la shell terminó: la pestaña queda con su nombre y Enter la reabre. */
   alive: boolean;
 }
@@ -85,6 +87,8 @@ document.getElementById("toggle-assistant")!.addEventListener("click", () => ass
 const settingsPanel = mountSettings(api, {
   onClose: () => active?.term.focus(),
   onChange: applySettings,
+  onExport: () => exportConfig(),
+  onImport: () => importConfig(),
 });
 document.getElementById("open-settings")!.addEventListener("click", () => void settingsPanel.open());
 mountProd(document.getElementById("prod") as HTMLElement, api, () => void settingsPanel.open("railway"));
@@ -103,7 +107,7 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     const session: Session = {
-      tabs: tabs.map(({ id, name, cwd, sectorId }) => ({ id, name, cwd, sectorId })),
+      tabs: tabs.map(({ id, name, cwd, sectorId, status }) => ({ id, name, cwd, sectorId, status })),
       activeId: active?.id ?? null,
       sectors,
     };
@@ -119,7 +123,7 @@ function startShell(tab: Tab) {
   return api.createPty(tab.id, tab.cwd, tab.term.cols, tab.term.rows);
 }
 
-function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: string | null } = {}, focus = true): Tab {
+function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: string | null; status?: TabStatus | null } = {}, focus = true): Tab {
   counter += 1;
   const id = opts.id ?? crypto.randomUUID();
 
@@ -156,9 +160,12 @@ function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: 
   pathEl.className = "path";
   // Las marcas LRM evitan que "~" y "/" se acomoden al revés por el direction: rtl del CSS.
   pathEl.textContent = `\u200e${shortPath(opts.cwd ?? "") || "~"}\u200e`;
+  // Etiqueta de estado (en proceso, deployando…): un clic la cambia.
+  const statusEl = document.createElement("span");
+  statusEl.className = "tab-status";
   const textEl = document.createElement("div");
   textEl.className = "text";
-  textEl.append(labelEl, pathEl);
+  textEl.append(labelEl, statusEl, pathEl);
   const closeBtn = document.createElement("button");
   closeBtn.className = "close";
   closeBtn.textContent = "×";
@@ -167,8 +174,9 @@ function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: 
 
   // Un sector que ya no existe (se borró en otra sesión) deja la pestaña suelta.
   const sectorId = sectors.some((x) => x.id === opts.sectorId) ? opts.sectorId! : null;
-  const tab: Tab = { id, name: opts.name ?? `Terminal ${counter}`, cwd: opts.cwd ?? "", term, fit, pane, tabEl, labelEl, sectorId, alive: false };
+  const tab: Tab = { id, name: opts.name ?? `Terminal ${counter}`, cwd: opts.cwd ?? "", term, fit, pane, tabEl, labelEl, sectorId, status: null, statusEl, alive: false };
   setName(tab, tab.name);
+  setStatus(tab, opts.status && opts.status in TAB_STATUS ? opts.status : null, false);
   tabs.push(tab);
   renderTabList();
 
@@ -187,6 +195,8 @@ function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: 
   });
   labelEl.addEventListener("dblclick", () => startRename(tab));
   tabEl.addEventListener("contextmenu", (e) => showContextMenu(e, tabMenu(tab)));
+  statusEl.addEventListener("mousedown", (e) => e.stopPropagation());
+  statusEl.addEventListener("click", (e) => showContextMenu(e, statusItems(tab)));
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     closeTab(tab);
@@ -555,9 +565,36 @@ function sectorMenu(sector: TabSector, nameEl: HTMLElement): MenuItem[] {
   ];
 }
 
+// ---------- etiquetas de estado ----------
+
+const TAB_STATUS: Record<TabStatus, { label: string; menu: string }> = {
+  working: { label: "En proceso", menu: "🔵 En proceso" },
+  "deploy-testing": { label: "Deploy testing", menu: "🟡 Deployando a testing" },
+  "deploy-prod": { label: "Deploy producción", menu: "🔴 Deployando a producción" },
+};
+
+function setStatus(tab: Tab, status: TabStatus | null, save = true) {
+  tab.status = status;
+  if (status) tab.tabEl.dataset.status = status;
+  else delete tab.tabEl.dataset.status;
+  tab.statusEl.textContent = status ? TAB_STATUS[status].label : "";
+  tab.statusEl.title = status ? "Cambiar la etiqueta" : "";
+  if (save) scheduleSave();
+}
+
+function statusItems(tab: Tab): MenuItem[] {
+  return [
+    { header: "Etiqueta" },
+    ...(Object.keys(TAB_STATUS) as TabStatus[]).map((s): MenuItem => ({ label: TAB_STATUS[s].menu, action: () => setStatus(tab, s), checked: tab.status === s })),
+    { label: "Sin etiqueta", action: () => setStatus(tab, null), checked: tab.status === null },
+  ];
+}
+
 function tabMenu(tab: Tab): MenuItem[] {
   return [
     { label: "Renombrar", action: () => startRename(tab) },
+    "-",
+    ...statusItems(tab),
     "-",
     { header: "Mover a" },
     { label: "Sin sector", action: () => moveToSector(tab, null), checked: tab.sectorId === null },
@@ -656,6 +693,8 @@ api.onMenu((cmd: MenuCommand) => {
   else if (cmd === "pomodoro-toggle") pomodoro.toggle();
   else if (cmd === "pomodoro-reset") pomodoro.reset();
   else if (cmd === "open-settings") void settingsPanel.open();
+  else if (cmd === "export-config") void exportConfig();
+  else if (cmd === "import-config") void importConfig();
   else if (cmd === "prev-tab" && order.length) activate(order[(idx - 1 + order.length) % order.length]);
   else if (cmd.startsWith("goto-tab:")) {
     const n = Number(cmd.split(":")[1]);
@@ -672,6 +711,51 @@ tabsEl.addEventListener("dblclick", (e) => {
 });
 
 new ResizeObserver(() => active?.fit.fit()).observe(panesEl);
+
+// ---------- exportar / importar la configuración ----------
+
+/** Todo lo que la ventana guarda en localStorage (anchos de paneles, solapa de tickets…). */
+function uiPrefs(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)!;
+      out[key] = localStorage.getItem(key) ?? "";
+    }
+  } catch {
+    // sin localStorage no hay preferencias de ventana que llevar
+  }
+  return out;
+}
+
+async function exportConfig(): Promise<boolean> {
+  // Que el archivo lleve las pestañas tal como están ahora.
+  clearTimeout(saveTimer);
+  await api.saveSession({ tabs: tabs.map(({ id, name, cwd, sectorId, status }) => ({ id, name, cwd, sectorId, status })), activeId: active?.id ?? null, sectors });
+  return (await api.exportConfig(uiPrefs())) !== null;
+}
+
+/** Aplica lo importado sin reiniciar: ajustes, preferencias y las pestañas que falten. */
+async function importConfig(): Promise<boolean> {
+  const result = await api.importConfig();
+  if (!result) return false;
+  applySettings(result.settings);
+  try {
+    for (const [key, value] of Object.entries(result.ui)) localStorage.setItem(key, String(value));
+  } catch {
+    // las preferencias de ventana son lo de menos
+  }
+  const s = result.session;
+  if (s) {
+    for (const sector of s.sectors ?? []) if (!sectors.some((x) => x.id === sector.id)) sectors.push(sector);
+    // Las pestañas nuevas arrancan sin robarle el foco a la actual.
+    for (const t of s.tabs) if (!tabs.some((x) => x.id === t.id)) createTab(t, false);
+    if (active) activate(active);
+    renderTabList();
+    scheduleSave();
+  }
+  return true;
+}
 
 // ---------- arranque: restaurar la sesión anterior ----------
 

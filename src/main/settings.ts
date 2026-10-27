@@ -41,6 +41,20 @@ const KNOWN_BROWSERS: { name: string; bundle: string; profilesDir?: string }[] =
 
 const file = () => join(app.getPath("userData"), "settings.json");
 
+/** Lo guardado (o importado) completado con los valores por defecto. */
+function withDefaults(saved: Partial<Settings>): Settings {
+  return {
+    browser: { ...DEFAULTS.browser, ...saved.browser },
+    pomodoro: { ...DEFAULTS.pomodoro, ...saved.pomodoro },
+    railway: { ...DEFAULTS.railway, ...saved.railway },
+    tickets: { ...DEFAULTS.tickets, ...saved.tickets },
+    muted: saved.muted ?? DEFAULTS.muted,
+    speak: saved.speak ?? DEFAULTS.speak,
+    assistant: { ...DEFAULTS.assistant, ...saved.assistant },
+    terminal: { ...DEFAULTS.terminal, ...saved.terminal },
+  };
+}
+
 export class SettingsStore {
   private settings: Settings = DEFAULTS;
 
@@ -50,17 +64,7 @@ export class SettingsStore {
 
   async load(): Promise<void> {
     try {
-      const saved = JSON.parse(await readFile(file(), "utf8")) as Partial<Settings>;
-      this.settings = {
-        browser: { ...DEFAULTS.browser, ...saved.browser },
-        pomodoro: { ...DEFAULTS.pomodoro, ...saved.pomodoro },
-        railway: { ...DEFAULTS.railway, ...saved.railway },
-        tickets: { ...DEFAULTS.tickets, ...saved.tickets },
-        muted: saved.muted ?? DEFAULTS.muted,
-        speak: saved.speak ?? DEFAULTS.speak,
-        assistant: { ...DEFAULTS.assistant, ...saved.assistant },
-        terminal: { ...DEFAULTS.terminal, ...saved.terminal },
-      };
+      this.settings = withDefaults(JSON.parse(await readFile(file(), "utf8")) as Partial<Settings>);
     } catch {
       // Primera vez o archivo corrupto: valores por defecto.
     }
@@ -72,6 +76,11 @@ export class SettingsStore {
     await writeFile(`${file()}.tmp`, JSON.stringify(this.settings, null, 2));
     await rename(`${file()}.tmp`, file());
     return this.settings;
+  }
+
+  /** Reemplaza todo (al importar una configuración); lo que falte queda por defecto. */
+  replace(saved: Partial<Settings>): Promise<Settings> {
+    return this.update(withDefaults(saved));
   }
 
   /** Abre un link http(s) con el navegador (y perfil) configurado; si falla, con el del sistema. */

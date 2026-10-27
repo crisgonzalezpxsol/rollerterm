@@ -15,17 +15,31 @@ const TOOLS = [
   {
     name: "crear_nota",
     description:
-      "Crea una nota en el panel de notas de rollerterm. La primera línea es el título. Usala cuando el usuario pida anotar algo.",
+      "Crea una nota en el panel de notas de rollerterm. La primera línea es el título; el resto admite Markdown " +
+      "(«## subtítulo», «- [ ] tarea»). Usala cuando el usuario pida anotar algo. Si la nota es de un cliente " +
+      "(agencia, hotel…), pasá `cliente` para que quede en su historial.",
     inputSchema: {
       type: "object",
-      properties: { texto: { type: "string", description: "Texto de la nota; la primera línea es el título." } },
+      properties: {
+        texto: { type: "string", description: "Texto de la nota; la primera línea es el título." },
+        cliente: { type: "string", description: "Cliente al que pertenece la nota (opcional)." },
+        etiquetas: { type: "array", items: { type: "string" }, description: "Etiquetas (opcional)." },
+      },
       required: ["texto"],
     },
   },
   {
     name: "buscar_notas",
-    description: "Lista las notas del usuario (las más recientes primero), opcionalmente filtradas por texto.",
-    inputSchema: { type: "object", properties: { q: { type: "string", description: "Texto a buscar (opcional)." } } },
+    description:
+      "Lista las notas del usuario (las más recientes primero), opcionalmente filtradas por texto o por cliente. " +
+      "Con `cliente` devuelve su historial: todas las notas de ese cliente.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        q: { type: "string", description: "Texto a buscar (opcional)." },
+        cliente: { type: "string", description: "Solo las notas de este cliente (opcional)." },
+      },
+    },
   },
   {
     name: "crear_recordatorio",
@@ -37,6 +51,7 @@ const TOOLS = [
       properties: {
         cuando: { type: "string", description: "Fecha y hora local, ISO 8601." },
         texto: { type: "string", description: "Qué hay que recordar." },
+        nota_id: { type: "string", description: "Id de una nota (de buscar_notas) para que el recordatorio quede en ella (opcional)." },
       },
       required: ["cuando", "texto"],
     },

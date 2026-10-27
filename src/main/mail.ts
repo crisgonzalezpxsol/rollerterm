@@ -134,6 +134,10 @@ export class MailSync {
     if (Date.now() - this.lastAttempt >= STALE_ON_FOCUS_MS) void this.sync();
   }
 
+  get lists(): { vip: string[]; blocked: string[] } {
+    return { vip: [...this.store.vip], blocked: [...this.store.blocked] };
+  }
+
   async setLists(vip: string[], blocked: string[]): Promise<void> {
     const clean = (list: string[]) => [...new Set(list.map(normalizeAddress).filter(Boolean))];
     this.store.vip = clean(vip);

@@ -12,7 +12,13 @@ export interface SettingsPanel {
 
 export function mountSettings(
   api: RollertermApi,
-  hooks: { onClose: () => void; onChange: (settings: Settings) => void },
+  hooks: {
+    onClose: () => void;
+    onChange: (settings: Settings) => void;
+    /** true si se exportó / importó (false = canceló). */
+    onExport: () => Promise<boolean>;
+    onImport: () => Promise<boolean>;
+  },
 ): SettingsPanel {
   const dialog = document.createElement("dialog");
   dialog.id = "settings";
@@ -73,6 +79,15 @@ export function mountSettings(
         <button class="rw-none">Ninguno</button>
       </div>
       <div class="rw-projects"></div>
+    </section>
+    <section data-section="backup">
+      <h3>Copia de seguridad</h3>
+      <p class="settings-help">Un archivo .json con todo lo configurable: estos ajustes, los correos importantes y bloqueados, las notas, los recordatorios pendientes y las pestañas con sus sectores y etiquetas. Sirve para pasarlo a otra Mac o guardarlo por las dudas. Importar suma y no borra nada; los ajustes sí se reemplazan.</p>
+      <div class="settings-actions">
+        <button class="cfg-export browser-test">Exportar…</button>
+        <button class="cfg-import pomo-test">Importar…</button>
+        <span class="cfg-done settings-saved" hidden></span>
+      </div>
     </section>`;
   document.body.append(dialog);
 
@@ -228,6 +243,21 @@ export function mountSettings(
     void save({ railway: { enabled: rwEnabled.checked, projects: settings!.railway.projects } });
   });
 
+  const cfgDone = $<HTMLSpanElement>(".cfg-done");
+  const cfgMessage = (text: string) => {
+    cfgDone.textContent = text;
+    cfgDone.hidden = false;
+    setTimeout(() => (cfgDone.hidden = true), 4000);
+  };
+  $<HTMLButtonElement>(".cfg-export").addEventListener("click", async () => {
+    if (await hooks.onExport()) cfgMessage("Exportada ✓");
+  });
+  $<HTMLButtonElement>(".cfg-import").addEventListener("click", async () => {
+    if (!(await hooks.onImport())) return;
+    settings = await api.getSettings();
+    render();
+    cfgMessage("Importada ✓");
+  });
   $<HTMLButtonElement>(".settings-close").addEventListener("click", () => dialog.close());
   dialog.addEventListener("close", hooks.onClose);
   // Clic en el fondo oscuro cierra.

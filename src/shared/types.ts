@@ -6,7 +6,12 @@ export interface SavedTab {
   cwd: string;
   /** Sector en el que está; null o ausente = suelta (arriba de los sectores). */
   sectorId?: string | null;
+  /** Etiqueta de estado que se ve en la pestaña; null o ausente = sin etiqueta. */
+  status?: TabStatus | null;
 }
+
+/** En qué anda el trabajo de una pestaña. */
+export type TabStatus = "working" | "deploy-testing" | "deploy-prod";
 
 /** Un grupo de pestañas de la columna lateral ("Tickets", "En espera", "Leer luego"). */
 export interface TabSector {
@@ -36,6 +41,8 @@ export type MenuCommand =
   | "toggle-mute"
   | "toggle-assistant"
   | "toggle-terminal-max"
+  | "export-config"
+  | "import-config"
   | `goto-tab:${number}`;
 
 /** API que el preload expone a la ventana como `window.rollerterm`. */
@@ -86,6 +93,15 @@ export interface RollertermApi {
   listNotes(): Promise<Note[]>;
   saveNote(note: Note): Promise<void>;
   deleteNote(id: string): Promise<void>;
+  /** Pendientes y los avisados en la última semana. */
+  listReminders(): Promise<Reminder[]>;
+  addReminder(when: string, text: string, noteId?: string): Promise<Reminder>;
+  removeReminder(id: string): Promise<boolean>;
+  onRemindersChanged(cb: () => void): void;
+  /** Guarda todo en un archivo .json que elige el usuario; null si canceló. */
+  exportConfig(ui: Record<string, string>): Promise<string | null>;
+  /** Pide un archivo, confirma y aplica lo de main; null si canceló o no era válido. */
+  importConfig(): Promise<ConfigImportResult | null>;
   /** Las conversaciones del asistente (la de la jornada primero). */
   chatList(): Promise<Conversation[]>;
   chatNew(): Promise<Conversation>;
@@ -413,6 +429,9 @@ export interface TicketsSettings {
 export interface Note {
   id: string;
   text: string;
+  /** De qué cliente es (agencia, hotel…): agrupa las notas en su historial. */
+  client?: string;
+  tags?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -473,6 +492,8 @@ export interface Reminder {
   when: string;
   text: string;
   done: boolean;
+  /** Nota de la que salió (se ve en su sección de recordatorios y el aviso la abre). */
+  noteId?: string;
 }
 
 export interface AssistantSettings {
@@ -482,4 +503,30 @@ export interface AssistantSettings {
   voice: string | null;
   /** Velocidad de lectura (1 = normal). */
   rate: number;
+}
+
+// ---------- exportar / importar la configuración ----------
+
+/** El archivo de configuración: todo lo que se puede configurar, en un solo JSON. */
+export interface ConfigBundle {
+  app: "rollerterm";
+  version: 1;
+  exportedAt: string;
+  settings: Settings;
+  /** Direcciones de correo importantes (★) y bloqueadas (ocultas). */
+  mail: { vip: string[]; blocked: string[] };
+  notes: Note[];
+  /** Solo los que todavía no avisaron. */
+  reminders: Reminder[];
+  /** Pestañas (nombre, carpeta, etiqueta) y sectores. */
+  session: Session | null;
+  /** Preferencias de la ventana: anchos de paneles, solapa elegida… */
+  ui: Record<string, string>;
+}
+
+/** Lo que el import le devuelve a la ventana para que lo aplique sin reiniciar. */
+export interface ConfigImportResult {
+  settings: Settings;
+  session: Session | null;
+  ui: Record<string, string>;
 }

@@ -1,4 +1,4 @@
-// Recordatorios que programa el asistente: se guardan en reminders.json y, a la hora, la
+// Recordatorios que programa el asistente o una nota: se guardan en reminders.json y, a la hora, la
 // app avisa (notificación + mensaje en el chat).
 import { randomUUID } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
@@ -11,7 +11,10 @@ const file = () => join(app.getPath("userData"), "reminders.json");
 export class Reminders {
   private list: Reminder[] = [];
 
-  constructor(private onFire: (r: Reminder) => void) {}
+  constructor(
+    private onFire: (r: Reminder) => void,
+    private onChange: () => void = () => {},
+  ) {}
 
   async start(): Promise<void> {
     try {
@@ -28,13 +31,29 @@ export class Reminders {
     return this.list.filter((r) => !r.done).sort((a, b) => Date.parse(a.when) - Date.parse(b.when));
   }
 
-  async add(when: string, text: string): Promise<Reminder> {
+  /** Pendientes y ya avisados (estos se guardan una semana). */
+  all(): Reminder[] {
+    return [...this.list].sort((a, b) => Date.parse(a.when) - Date.parse(b.when));
+  }
+
+  async add(when: string, text: string, noteId?: string): Promise<Reminder> {
     const ms = Date.parse(when);
     if (Number.isNaN(ms)) throw new Error(`Fecha inválida: ${when}`);
     const r: Reminder = { id: randomUUID().slice(0, 8), when: new Date(ms).toISOString(), text, done: false };
+    if (noteId) r.noteId = noteId;
     this.list.push(r);
     await this.save();
     return r;
+  }
+
+  /** Suma recordatorios importados que todavía no pasaron y que no estaban. */
+  async merge(incoming: Reminder[]): Promise<number> {
+    const now = Date.now();
+    const fresh = incoming.filter((r) => !r.done && Date.parse(r.when) > now && !this.list.some((x) => x.id === r.id));
+    if (!fresh.length) return 0;
+    this.list.push(...fresh);
+    await this.save();
+    return fresh.length;
   }
 
   async remove(id: string): Promise<boolean> {
@@ -61,5 +80,6 @@ export class Reminders {
   private async save(): Promise<void> {
     await writeFile(`${file()}.tmp`, JSON.stringify(this.list, null, 2));
     await rename(`${file()}.tmp`, file());
+    this.onChange();
   }
 }
