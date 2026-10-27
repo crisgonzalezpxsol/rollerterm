@@ -10,7 +10,7 @@ import { showContextMenu, type MenuItem } from "./context-menu";
 import { mountTicketView } from "./ticket-view";
 import { mountMail } from "./mail";
 import { mountNotes } from "./notes";
-import { setMuted } from "./notify";
+import { notify, setMuted } from "./notify";
 import { setVoicePrefs } from "./speech";
 import { baseName, mountPathPicker } from "./path-picker";
 import { mountPomodoro } from "./pomodoro";
@@ -42,6 +42,9 @@ interface Tab {
   statusEl: HTMLSpanElement;
   /** false cuando la shell terminó: la pestaña queda con su nombre y Enter la reabre. */
   alive: boolean;
+  /** Claude Code en esta pestaña: trabajando, o terminó y todavía no se miró. */
+  claude: "busy" | "done" | null;
+  claudeEl: HTMLSpanElement;
 }
 
 const tabsEl = document.getElementById("tabs") as HTMLDivElement;
@@ -170,11 +173,13 @@ function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: 
   closeBtn.className = "close";
   closeBtn.textContent = "×";
   closeBtn.title = "Cerrar (⌘W)";
-  tabEl.append(textEl, closeBtn);
+  const claudeEl = document.createElement("span");
+  claudeEl.className = "tab-claude";
+  tabEl.append(textEl, claudeEl, closeBtn);
 
   // Un sector que ya no existe (se borró en otra sesión) deja la pestaña suelta.
   const sectorId = sectors.some((x) => x.id === opts.sectorId) ? opts.sectorId! : null;
-  const tab: Tab = { id, name: opts.name ?? `Terminal ${counter}`, cwd: opts.cwd ?? "", term, fit, pane, tabEl, labelEl, sectorId, status: null, statusEl, alive: false };
+  const tab: Tab = { id, name: opts.name ?? `Terminal ${counter}`, cwd: opts.cwd ?? "", term, fit, pane, tabEl, labelEl, sectorId, status: null, statusEl, alive: false, claude: null, claudeEl };
   setName(tab, tab.name);
   setStatus(tab, opts.status && opts.status in TAB_STATUS ? opts.status : null, false);
   tabs.push(tab);
@@ -188,6 +193,14 @@ function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: 
     }
   });
   term.onResize(({ cols, rows }) => api.resize(tab.id, cols, rows));
+  // Claude Code anuncia su estado en el título: "◐ Tarea" mientras trabaja, "✳ Tarea" al terminar.
+  term.onTitleChange((title) => {
+    if (CLAUDE_BUSY.test(title)) setClaude(tab, "busy");
+    else if (tab.claude === "busy") {
+      if (title.startsWith("✳")) claudeFinished(tab, title.slice(1).trim());
+      else setClaude(tab, null); // se cerró Claude y la shell retomó el título
+    }
+  });
 
   tabEl.addEventListener("mousedown", (e) => {
     if (e.button === 1) closeTab(tab); // clic con la rueda cierra, como en el navegador
@@ -216,6 +229,7 @@ function activate(tab: Tab, focus = true) {
     active.tabEl.classList.remove("active");
   }
   active = tab;
+  if (tab.claude === "done") setClaude(tab, null);
   const sector = sectors.find((x) => x.id === tab.sectorId);
   if (sector?.collapsed) {
     sector.collapsed = false;
@@ -229,6 +243,41 @@ function activate(tab: Tab, focus = true) {
   if (focus) tab.term.focus();
   scheduleSave();
 }
+
+/** Spinner del título de Claude Code (◐◓◑◒ y, en versiones anteriores, braille). */
+const CLAUDE_BUSY = /^[\u25d0-\u25d3\u2800-\u28ff] /;
+
+function setClaude(tab: Tab, state: Tab["claude"]) {
+  if (tab.claude === state) return;
+  const wasDone = tab.claude === "done";
+  tab.claude = state;
+  if (state) tab.tabEl.dataset.claude = state;
+  else delete tab.tabEl.dataset.claude;
+  tab.claudeEl.textContent = state === "done" ? "✳ Listo" : state === "busy" ? "✳" : "";
+  tab.claudeEl.title = state === "done" ? "Claude terminó" : state === "busy" ? "Claude está trabajando" : "";
+  // Si la pestaña está en un sector plegado, el sector también lo muestra.
+  if (tab.sectorId && (wasDone || state === "done")) renderTabList();
+}
+
+function claudeFinished(tab: Tab, task: string) {
+  // Si la estás mirando, no hace falta avisar.
+  if (tab === active && document.hasFocus()) {
+    setClaude(tab, null);
+    return;
+  }
+  setClaude(tab, "done");
+  if (!document.hasFocus()) {
+    notify("✳ Claude terminó", task && task !== "Claude Code" ? `${tab.name} · ${task}` : tab.name, () => {
+      window.focus();
+      activate(tab);
+    });
+  }
+}
+
+// Volver a la ventana cuenta como haber visto la pestaña activa.
+window.addEventListener("focus", () => {
+  if (active?.claude === "done") setClaude(active, null);
+});
 
 function closeTab(tab: Tab) {
   const order = visualOrder();
@@ -440,6 +489,7 @@ function renderTabList() {
     block.className = "sector";
     block.classList.toggle("collapsed", sector.collapsed);
     const members = tabs.filter((t) => t.sectorId === sector.id);
+    block.classList.toggle("claude-done", members.some((t) => t.claude === "done"));
     const head = document.createElement("div");
     head.className = "sector-head";
     head.title = "Clic: plegar / desplegar · doble clic: renombrar · clic derecho: más opciones";

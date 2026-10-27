@@ -145,6 +145,17 @@ body.resizing-dock { cursor: col-resize; user-select: none; }
   animation: rgb-flow-vertical 8s linear infinite;
 }
 .tab.ended .label { color: var(--ended); font-style: italic; }
+/* Claude Code: ✳ que late mientras trabaja; al terminar, la pestaña se destaca hasta que la mirás. */
+.tab-claude { display: none; flex-shrink: 0; align-self: center; padding: 0 6px; border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 16px; white-space: nowrap; color: #d97757; }
+.tab[data-claude] .tab-claude { display: inline-block; }
+.tab[data-claude="busy"] .tab-claude { animation: claude-busy 1.6s ease-in-out infinite; }
+.tab[data-claude="done"] { background: #d977571f; box-shadow: inset 0 0 0 1px #d9775766; }
+.tab[data-claude="done"] .label { color: var(--text); font-weight: 600; }
+.tab[data-claude="done"] .tab-claude { background: #d97757; color: #13112b; animation: claude-done 1.8s ease-in-out infinite; }
+.sector.collapsed.claude-done .sector-head { color: #f0a080; }
+.sector.collapsed.claude-done .sector-name::after { content: " ✳"; color: #d97757; }
+@keyframes claude-busy { 50% { opacity: 0.35; transform: rotate(90deg); } }
+@keyframes claude-done { 50% { box-shadow: 0 0 0 3px #d9775740; } }
 .tab.drag-over { box-shadow: inset 0 2px 0 var(--accent); }
 
 .tab .text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
