@@ -5,6 +5,7 @@ import { Assistant } from "./assistant";
 import { Bridge } from "./bridge";
 import { CalendarSync } from "./calendar";
 import { ClaudeRunner } from "./claude-runner";
+import { ClaudeUsage } from "./claude-usage";
 import { MailSync } from "./mail";
 import { NotesStore } from "./notes";
 import { listMcpServers } from "./mcp-client";
@@ -31,6 +32,7 @@ const prod = new RailwayMonitor(
   () => settings.current.railway,
   (state) => win?.webContents.send("prod:state", state),
 );
+const usage = new ClaudeUsage((state) => win?.webContents.send("usage:state", state));
 const tickets = new TicketsMonitor(
   () => settings.current.tickets,
   (state) => win?.webContents.send("tickets:state", state),
@@ -63,6 +65,8 @@ ipcMain.handle("prod:get", () => prod.current);
 ipcMain.on("prod:refresh", () => void prod.check());
 // Usa la lista en memoria del monitor (se refresca sola cada 30 min): así Configuración abre al instante.
 ipcMain.handle("prod:projects", () => prod.listProjects().catch(() => []));
+ipcMain.handle("usage:get", () => usage.current);
+ipcMain.on("usage:refresh", () => void usage.check());
 ipcMain.handle("settings:browsers", () => listBrowsers());
 ipcMain.on("settings:test-browser", () => settings.openUrl("https://calendar.google.com"));
 // ---------- asistente ----------
@@ -304,6 +308,7 @@ app.whenReady().then(async () => {
   calendar.start();
   void mail.start();
   prod.start();
+  usage.start();
   tickets.start();
   app.on("activate", () => {
     if (!win) createWindow();

@@ -71,6 +71,9 @@ export interface RollertermApi {
   refreshProd(): void;
   onProd(cb: (state: ProdState) => void): void;
   listRailwayProjects(): Promise<RailwayProject[]>;
+  getUsage(): Promise<UsageState>;
+  refreshUsage(): void;
+  onUsage(cb: (state: UsageState) => void): void;
   getTickets(): Promise<TicketsState>;
   refreshTickets(): void;
   /** El hilo completo de un ticket. */
@@ -285,6 +288,43 @@ export interface ProdState {
   checking: boolean;
   lastCheck: number | null;
   services: ProdService[];
+}
+
+/** Tokens y costo estimado (USD a precio de API) de un período de Claude Code. */
+export interface UsageTotals {
+  cost: number;
+  input: number;
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+  /** Respuestas del modelo. */
+  messages: number;
+}
+
+/** Ventana de 5 h como las del plan de Claude. */
+export interface UsageBlock {
+  start: number;
+  end: number;
+  totals: UsageTotals;
+}
+
+export interface UsageRow {
+  name: string;
+  cost: number;
+  tokens: number;
+}
+
+export interface UsageState {
+  status: "loading" | "ok" | "error";
+  lastCheck: number | null;
+  today: UsageTotals;
+  /** Últimos 7 días. */
+  week: UsageTotals;
+  /** La ventana de 5 h en curso; null si no hubo uso en las últimas 5 h. */
+  block: UsageBlock | null;
+  /** De hoy, de mayor a menor costo. */
+  models: UsageRow[];
+  projects: UsageRow[];
 }
 
 export interface RailwayProject {

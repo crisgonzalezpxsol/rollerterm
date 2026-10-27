@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { CalendarState, ChatStreamEvent, Reminder, MailState, MailThread, MenuCommand, ProdState, Session, RollertermApi, TicketsState } from "../shared/types";
+import type { CalendarState, ChatStreamEvent, Reminder, MailState, MailThread, MenuCommand, ProdState, Session, RollertermApi, TicketsState, UsageState } from "../shared/types";
 
 const api: RollertermApi = {
   createPty: (id, cwd, cols, rows) => ipcRenderer.invoke("pty:create", id, cwd, cols, rows),
@@ -49,6 +49,9 @@ const api: RollertermApi = {
   refreshProd: () => ipcRenderer.send("prod:refresh"),
   onProd: (cb) => ipcRenderer.on("prod:state", (_e, state: ProdState) => cb(state)),
   listRailwayProjects: () => ipcRenderer.invoke("prod:projects"),
+  getUsage: () => ipcRenderer.invoke("usage:get"),
+  refreshUsage: () => ipcRenderer.send("usage:refresh"),
+  onUsage: (cb) => ipcRenderer.on("usage:state", (_e, state: UsageState) => cb(state)),
   onNewMail: (cb) => ipcRenderer.on("mail:new", (_e, threads: MailThread[]) => cb(threads)),
 };
 

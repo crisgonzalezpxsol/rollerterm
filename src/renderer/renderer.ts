@@ -17,6 +17,7 @@ import { mountPomodoro } from "./pomodoro";
 import { mountProd } from "./prod";
 import { mountSettings } from "./settings";
 import { mountTickets } from "./tickets";
+import { mountUsage } from "./usage";
 
 declare global {
   interface Window {
@@ -87,6 +88,7 @@ const settingsPanel = mountSettings(api, {
 });
 document.getElementById("open-settings")!.addEventListener("click", () => void settingsPanel.open());
 mountProd(document.getElementById("prod") as HTMLElement, api, () => void settingsPanel.open("railway"));
+mountUsage(document.getElementById("usage") as HTMLElement, api);
 const pathPicker = mountPathPicker(api, { settings: () => settings, onChange: applySettings });
 
 let tabs: Tab[] = [];
