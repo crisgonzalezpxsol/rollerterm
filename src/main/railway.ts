@@ -34,7 +34,7 @@ const QUERY = `query($id: String!) {
                 serviceId
                 serviceName
                 source { repo }
-                latestDeployment { status createdAt meta }
+                latestDeployment { status createdAt meta creator { name } }
                 activeDeployments { status }
               }
             }
@@ -59,6 +59,8 @@ const IGNORED = new Set(["REMOVED", "REMOVING", "SKIPPED"]);
 interface DeployMeta {
   branch?: string | null;
   commitHash?: string | null;
+  commitMessage?: string | null;
+  commitAuthor?: string | null;
   repo?: string | null;
 }
 
@@ -66,7 +68,7 @@ interface Instance {
   serviceId: string;
   serviceName: string;
   source: { repo: string | null } | null;
-  latestDeployment: { status: string; createdAt: string; meta: DeployMeta | null } | null;
+  latestDeployment: { status: string; createdAt: string; meta: DeployMeta | null; creator: { name: string | null } | null } | null;
   activeDeployments: { status: string }[] | null;
 }
 
@@ -278,6 +280,8 @@ export class RailwayMonitor {
             repo: i.source?.repo ?? i.latestDeployment?.meta?.repo ?? null,
             branch: i.latestDeployment?.meta?.branch ?? null,
             commit: i.latestDeployment?.meta?.commitHash ?? null,
+            commitMessage: i.latestDeployment?.meta?.commitMessage?.split("\n")[0] ?? null,
+            author: i.latestDeployment?.creator?.name || i.latestDeployment?.meta?.commitAuthor || null,
             stale: null,
           },
         ];

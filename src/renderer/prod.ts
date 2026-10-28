@@ -206,6 +206,14 @@ export function mountProd(root: HTMLElement, api: RollertermApi, openSettings: (
       const detail = document.createElement("span");
       detail.textContent = `${HEALTH_LABEL[x.health]} · ${STATUS_LABEL[x.status] ?? x.status}${x.since ? ` · ${ago(Date.parse(x.since))}` : ""}`;
       li.append(name, detail);
+      // Qué se está subiendo y de quién: autor, rama, commit y su mensaje.
+      if (x.author || x.branch || x.commit) {
+        const rev = document.createElement("small");
+        rev.className = "prod-rev";
+        rev.textContent = [x.author && `👤 ${x.author}`, x.branch && `⎇ ${x.branch}`, x.commit?.slice(0, 7), x.commitMessage && `«${x.commitMessage}»`].filter(Boolean).join(" · ");
+        rev.title = x.commitMessage ?? "";
+        li.append(rev);
+      }
       li.addEventListener("click", () => window.open(x.url));
       list.append(li);
     }

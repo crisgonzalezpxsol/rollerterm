@@ -780,6 +780,7 @@ pre.detail[hidden] { display: none; }
 .prod-stale-item span { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prod-stale-item small { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
 .prod-list li span { color: var(--text-muted); }
+.prod-list li .prod-rev { color: var(--text-muted); font-size: 11px; opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prod-config { margin-top: 6px; border: 0; background: transparent; color: var(--accent); font: inherit; padding: 2px 0; }
 .prod-config:hover { text-decoration: underline; }
 #settings .rw-projects { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin-top: 4px; }

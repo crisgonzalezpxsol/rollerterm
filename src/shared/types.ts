@@ -276,6 +276,10 @@ export interface ProdService {
   branch: string | null;
   /** Commit completo del último deploy. */
   commit: string | null;
+  /** Primera línea del mensaje del commit del último deploy. */
+  commitMessage: string | null;
+  /** Quién lanzó el último deploy (nombre en Railway, o el autor del commit en GitHub). */
+  author: string | null;
   /** Railway lleva más de 3 h sin desplegar lo último (aunque el servicio siga andando). */
   stale: StaleDeploy | null;
 }
