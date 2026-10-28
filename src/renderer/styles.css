@@ -114,8 +114,8 @@ body.resizing-dock { cursor: col-resize; user-select: none; }
   overscroll-behavior: contain;
 }
 #tabs::-webkit-scrollbar { width: 6px; }
-#tabs::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
-#tabs:hover::-webkit-scrollbar-thumb { background: #ffffff26; }
+#tabs::-webkit-scrollbar-thumb { background: #ffffff14; border-radius: 3px; }
+#tabs:hover::-webkit-scrollbar-thumb { background: #ffffff33; }
 
 .tab {
   position: relative;
@@ -249,10 +249,10 @@ body.resizing-dock { cursor: col-resize; user-select: none; }
 }
 
 /* ---------- sectores de pestañas ---------- */
-.tab-group { display: flex; flex-direction: column; gap: 2px; }
+.tab-group { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
 .tab-group.loose { min-height: 8px; padding-bottom: 4px; }
 .tab-group.drop-target, .sector-head.drop-target { background: #7c5cff1f; border-radius: 8px; }
-.sector { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; border-top: 1px solid #ffffff0d; }
+.sector { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; padding-top: 6px; border-top: 1px solid #ffffff0d; }
 .sector-head {
   display: flex;
   align-items: center;
