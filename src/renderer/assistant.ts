@@ -187,10 +187,23 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
       b.classList.toggle("on", current?.conv.id === c.id);
       b.classList.toggle("busy", c.busy);
       b.classList.toggle("unread", v.unread);
-      b.title = c.daily ? "La jornada: recuerda todo lo de hoy" : `${c.title}\nDoble clic: renombrar · clic derecho: más opciones`;
+      b.title = c.daily ? "La jornada: recuerda todo lo de hoy" : `${c.title}\nDoble clic: renombrar · ×: borrar · clic derecho: más opciones`;
       const label = document.createElement("span");
       label.textContent = c.daily ? `☀ ${c.title}` : c.title;
       b.append(label);
+      if (!c.daily) {
+        // Un <span> y no un <button>: va adentro del botón de la pestaña.
+        const del = document.createElement("span");
+        del.className = "as-conv-close";
+        del.textContent = "×";
+        del.title = "Borrar conversación";
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void deleteConv(c);
+        });
+        del.addEventListener("dblclick", (e) => e.stopPropagation());
+        b.append(del);
+      }
       b.addEventListener("click", () => select(c.id));
       b.addEventListener("dblclick", () => !c.daily && renameConv(c, b, label));
       b.addEventListener("contextmenu", (e) =>

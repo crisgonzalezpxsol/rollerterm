@@ -1243,6 +1243,10 @@ pre.detail[hidden] { display: none; }
   font: inherit;
 }
 .as-conv span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.as-conv { display: flex; align-items: center; gap: 4px; }
+.as-conv .as-conv-close { flex-shrink: 0; width: 16px; height: 16px; margin-right: -6px; border-radius: 50%; line-height: 15px; text-align: center; font-size: 13px; opacity: 0; cursor: pointer; }
+.as-conv:hover .as-conv-close, .as-conv.on .as-conv-close { opacity: 0.7; }
+.as-conv .as-conv-close:hover { opacity: 1; background: #ffffff1a; }
 .as-conv:hover { background: #ffffff0d; color: var(--text); }
 .as-conv.on { background: var(--tab); border-color: #ffffff1a; color: var(--text); }
 .as-conv input { width: 140px; font: inherit; color: var(--text); background: var(--input); border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; outline: none; }
