@@ -2,16 +2,30 @@
 
 Prueba para medir cuánto más liviano sería rollerterm con Tauri (Rust + el webview del sistema) en vez de Electron.
 
-**Qué incluye:** pestañas con nombre (doble clic para renombrar), `+`, `Ctrl+Shift+T` / `Ctrl+Shift+W`, y xterm.js con el mismo tema, conectado a una shell de login por pestaña.
+Corre **la misma interfaz** de `src/renderer/`, sin cambios. `frontend/tauri-api.ts` reemplaza al preload: implementa `window.rollerterm` sobre comandos de Rust (`src-tauri/src/`).
 
-**Qué no incluye:** notas, tickets, asistente, mail, calendario, sesiones guardadas ni ajustes.
+**Ya portado:**
+- Terminales.
+- Pestañas: renombrar, etiquetas de estado, arrastrar entre sectores.
+- Sectores (Tickets, En espera, Leer luego).
+- Sesión: al cerrar la ventana se guarda la carpeta en la que quedó cada shell.
+- Configuración y selector de carpetas.
+- Notas.
+- Links: se abren con `xdg-open`.
+- Atajos: los de Electron en Linux.
 
-| Pieza | Electron | Prototipo |
+**Pendiente:** correo, agenda, tickets (panel MCP), asistente, Railway, uso de Claude, recordatorios y exportar/importar. Hasta portarlos responden «todavía no está disponible».
+
+**Datos:** se guardan en `~/.config/rollerterm-tauri`, aparte de Electron, así las dos versiones conviven. La primera vez se copian `session.json`, `settings.json` y `notes.json` de `~/.config/rollerterm`.
+
+| Pieza | Electron | Tauri |
 |---|---|---|
-| PTY | `node-pty` (`src/main/pty-manager.ts`) | `portable-pty` (`src-tauri/src/main.rs`) |
-| IPC | `ipcMain` + preload | `#[tauri::command]` + `Channel` |
-| Interfaz | Chromium empaquetado | WebKitGTK del sistema |
-| Frontend | `src/renderer/` | `frontend/main.ts` (el mismo xterm.js de `node_modules`) |
+| PTY | `node-pty` (`src/main/pty-manager.ts`) | `portable-pty` (`src-tauri/src/pty.rs`) |
+| Sesión, ajustes, notas | `session-store.ts`, `settings.ts`, `notes.ts` | `src-tauri/src/store.rs` |
+| IPC | `ipcMain` + preload | `#[tauri::command]` + `frontend/tauri-api.ts` |
+| Motor de la interfaz | Chromium empaquetado | WebKitGTK del sistema |
+
+Los errores de JavaScript de la ventana salen por la consola con el prefijo `[ventana]`, porque en release no hay devtools.
 
 ## Instalar dependencias (una sola vez, Ubuntu 24.04)
 

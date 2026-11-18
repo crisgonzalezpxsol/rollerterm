@@ -13,7 +13,10 @@
         "label": "main",
         "title": "rollerterm (Tauri)",
         "width": 1100,
-        "height": 700
+        "height": 700,
+        "minWidth": 480,
+        "minHeight": 300,
+        "backgroundColor": "#13112b"
       }
     ],
     "security": {
@@ -22,6 +25,8 @@
   },
   "bundle": {
     "active": false,
-    "icon": ["../../assets/icon.png"]
+    "icon": [
+      "../../assets/icon.png"
+    ]
   }
 }
