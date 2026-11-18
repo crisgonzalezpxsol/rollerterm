@@ -6,17 +6,17 @@ DEST="$HOME/.local/opt/rollerterm"
 [ -x "$SRC/rollerterm" ] || { echo "Falta $SRC; corré npm run dist:linux"; exit 1; }
 
 rm -rf "$DEST"
-mkdir -p "$DEST" "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/512x512/apps"
+mkdir -p "$DEST" "$HOME/.local/bin" "$HOME/.local/share/applications"
 cp -a "$SRC/." "$DEST/"
 ln -sf "$DEST/rollerterm" "$HOME/.local/bin/rollerterm"
-cp assets/icon.png "$HOME/.local/share/icons/hicolor/512x512/apps/rollerterm.png"
+
 
 cat > "$HOME/.local/share/applications/rollerterm.desktop" <<DESKTOP
 [Desktop Entry]
 Name=rollerterm
 Comment=Terminal con pestañas con nombre, una por ticket o funcionalidad
 Exec=$DEST/rollerterm %U
-Icon=rollerterm
+Icon=$DEST/resources/app/dist/icon.png
 Terminal=false
 Type=Application
 Categories=Development;TerminalEmulator;
