@@ -1,16 +1,9 @@
 // Reemplazo de src/preload/preload.ts para Tauri: implementa la misma `window.rollerterm`
 // sobre comandos de Rust, así src/renderer/ corre sin cambios.
 //
-// Ya portado: terminales, sesión (pestañas y sectores), configuración, selector de carpetas,
-// notas, links, agenda, correo, notificaciones, recordatorios y asistente. Lo que falta
-// (tickets, Railway, uso de Claude, exportar/importar) responde «no disponible todavía».
-import type {
-  MenuCommand,
-  ProdState,
-  RollertermApi,
-  TicketsState,
-  UsageState,
-} from "../../src/shared/types";
+// Todo src/main/ de Electron está portado a Rust (src-tauri/src/). Lo único distinto en
+// Linux: los links se abren siempre con el navegador predeterminado (xdg-open).
+import type { MenuCommand, RollertermApi } from "../../src/shared/types";
 
 type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
@@ -25,19 +18,12 @@ function noopErr() {}
 window.addEventListener("error", (e) => report(`${e.message} @ ${e.filename}:${e.lineno}:${e.colno}`));
 window.addEventListener("unhandledrejection", (e) => report(`promesa rechazada: ${e.reason?.stack ?? e.reason}`));
 
-const PENDING = "Todavía no está disponible en la versión Tauri.";
-const notYet = () => Promise.reject(new Error(PENDING));
 const noop = () => {};
 
 let dataCb: (id: string, data: string) => void = noop;
 let exitCb: (id: string, code: number) => void = noop;
 let menuCb: (cmd: MenuCommand) => void = noop;
 
-// "disabled" oculta esos indicadores en vez de mostrarlos rotos.
-const tickets: TicketsState = { status: "disabled", message: PENDING, checking: false, lastCheck: null, tickets: [], webUrl: null, environment: null };
-const prod: ProdState = { status: "disabled", message: PENDING, checking: false, lastCheck: null, services: [] };
-const zero = { cost: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, messages: 0 };
-const usage: UsageState = { status: "error", lastCheck: null, today: zero, week: zero, block: null, models: [], projects: [] };
 
 const api: RollertermApi = {
   // ---------- terminales ----------
@@ -60,10 +46,10 @@ const api: RollertermApi = {
   saveSession: (session) => invoke("session_save", { session }),
   getSettings: () => invoke("settings_get"),
   setSettings: (patch) => invoke("settings_set", { patch }),
-  listBrowsers: () => Promise.resolve([]),
+  listBrowsers: () => invoke("list_browsers"),
   testBrowser: () => void invoke("open_url", { url: "https://calendar.google.com" }),
-  exportConfig: notYet,
-  importConfig: notYet,
+  exportConfig: (ui) => invoke("config_export", { ui }),
+  importConfig: () => invoke("config_import"),
 
   // ---------- notas ----------
   listNotes: () => invoke("notes_list"),
@@ -89,20 +75,20 @@ const api: RollertermApi = {
   onMail: (cb) => on("mail:state", cb),
   onNewMail: (cb) => on("mail:new", cb),
 
-  // ---------- tickets, Railway y uso de Claude (pendiente) ----------
-  getTickets: () => Promise.resolve(tickets),
-  refreshTickets: noop,
-  viewTicket: notYet,
-  ticketAction: notYet,
-  onTickets: noop,
-  listMcpServers: () => Promise.resolve([]),
-  getProd: () => Promise.resolve(prod),
-  refreshProd: noop,
-  onProd: noop,
-  listRailwayProjects: () => Promise.resolve([]),
-  getUsage: () => Promise.resolve(usage),
-  refreshUsage: noop,
-  onUsage: noop,
+  // ---------- tickets, Railway y uso de Claude ----------
+  getTickets: () => invoke("tickets_get"),
+  refreshTickets: () => void invoke("tickets_refresh"),
+  viewTicket: (numero) => invoke("tickets_view", { numero, action: null }),
+  ticketAction: (numero, action) => invoke("tickets_view", { numero, action }),
+  onTickets: (cb) => on("tickets:state", cb),
+  listMcpServers: () => invoke("tickets_servers"),
+  getProd: () => invoke("prod_get"),
+  refreshProd: () => void invoke("prod_refresh"),
+  onProd: (cb) => on("prod:state", cb),
+  listRailwayProjects: () => invoke("prod_projects"),
+  getUsage: () => invoke("usage_get"),
+  refreshUsage: () => void invoke("usage_refresh"),
+  onUsage: (cb) => on("usage:state", cb),
 
   // ---------- asistente ----------
   chatList: () => invoke("chat_list"),

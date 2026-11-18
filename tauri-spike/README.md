@@ -4,24 +4,30 @@ Prueba para medir cuánto más liviano sería rollerterm con Tauri (Rust + el we
 
 Corre **la misma interfaz** de `src/renderer/`, sin cambios. `frontend/tauri-api.ts` reemplaza al preload: implementa `window.rollerterm` sobre comandos de Rust (`src-tauri/src/`).
 
-**Ya portado:**
-- Terminales.
-- Pestañas: renombrar, etiquetas de estado, arrastrar entre sectores.
-- Sectores (Tickets, En espera, Leer luego).
-- Sesión: al cerrar la ventana se guarda la carpeta en la que quedó cada shell.
-- Configuración y selector de carpetas.
-- Notas.
-- Links: se abren con `xdg-open`.
-- Atajos: los de Electron en Linux.
+**Portado:** todo `src/main/` de Electron.
+- Terminales, pestañas, sectores y sesión.
+- Configuración, notas y recordatorios.
+- Agenda y correo, vía conectores de claude.ai.
+- Asistente: el servidor MCP es este mismo binario con `--mcp`, así que no hace falta Node.
+- Tickets (MCP por stdio), Railway, uso de Claude y exportar/importar.
+- Notificaciones nativas.
 
-**Pendiente:** correo, agenda, tickets (panel MCP), asistente, Railway, uso de Claude, recordatorios y exportar/importar. Hasta portarlos responden «todavía no está disponible».
+**Solo en Tauri:** monitor de sistema en la cabecera (CPU y RAM disponible/total, leídos de `/proc`).
 
-**Datos:** se guardan en `~/.config/rollerterm-tauri`, aparte de Electron, así las dos versiones conviven. La primera vez se copian `session.json`, `settings.json` y `notes.json` de `~/.config/rollerterm`.
+**Diferencias en Linux:**
+- Los links se abren con el navegador predeterminado (`xdg-open`).
+- La inactividad se aproxima con el foco de la ventana.
+- El asistente no lee en voz alta, porque WebKitGTK no tiene síntesis de voz.
+
+**Datos:** se guardan en `~/.config/rollerterm-tauri`, aparte de Electron, así las dos versiones conviven. La primera vez se copian de `~/.config/rollerterm` la sesión, la configuración, las notas, el correo, los recordatorios y la carpeta del asistente (memoria, diario y conversaciones).
 
 | Pieza | Electron | Tauri |
 |---|---|---|
-| PTY | `node-pty` (`src/main/pty-manager.ts`) | `portable-pty` (`src-tauri/src/pty.rs`) |
-| Sesión, ajustes, notas | `session-store.ts`, `settings.ts`, `notes.ts` | `src-tauri/src/store.rs` |
+| PTY | `node-pty` (`src/main/pty-manager.ts`) | `portable-pty` (`pty.rs`) |
+| Sesión, ajustes, notas | `session-store.ts`, `settings.ts`, `notes.ts` | `store.rs` |
+| Claude Code, agenda, correo | `claude-runner.ts`, `calendar.ts`, `mail.ts` | `claude_runner.rs`, `calendar.rs`, `mail.rs` |
+| Asistente | `assistant.ts`, `bridge.ts`, `rollerterm-mcp.cjs` | `assistant.rs`, `bridge.rs`, `mcp_server.rs`, `rt_tools.rs` |
+| Tickets, Railway, uso | `tickets.ts`, `mcp-client.ts`, `railway.ts`, `claude-usage.ts` | `tickets.rs`, `mcp_client.rs`, `railway.rs`, `usage.rs` |
 | IPC | `ipcMain` + preload | `#[tauri::command]` + `frontend/tauri-api.ts` |
 | Motor de la interfaz | Chromium empaquetado | WebKitGTK del sistema |
 

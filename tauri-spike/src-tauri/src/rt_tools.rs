@@ -4,6 +4,8 @@
 use crate::bridge::Bridge;
 use crate::calendar::CalendarSync;
 use crate::mail::MailSync;
+use crate::railway::RailwayMonitor;
+use crate::tickets::TicketsMonitor;
 use crate::reminders::Reminders;
 use crate::store::Store;
 use crate::util::{now_ms, parse_iso_ms};
@@ -33,6 +35,8 @@ pub fn register(
     reminders: Arc<Reminders>,
     calendar: Arc<CalendarSync>,
     mail: Arc<MailSync>,
+    tickets: Arc<TicketsMonitor>,
+    prod: Arc<RailwayMonitor>,
 ) {
     let a = app.clone();
     bridge.on("crear_nota", move |args, _| {
@@ -131,7 +135,7 @@ pub fn register(
     });
 
     bridge.on("contexto_actual", move |_, _| {
-        let (cal, m) = (calendar.current(), mail.current());
+        let (cal, m, t, p) = (calendar.current(), mail.current(), tickets.current(), prod.current());
         async move {
             json!({
                 "agenda": cal.events.iter().map(|e| json!({
@@ -145,9 +149,32 @@ pub fn register(
                         "de": x.from_email, "asunto": x.subject, "fecha": x.date, "sinLeer": x.unread, "extracto": x.snippet
                     })).collect::<Vec<_>>()
                 },
-                // Tickets y producción llegan con la etapa 3 del port.
-                "tickets": { "entorno": null, "mios": [], "sinDueno": [] },
-                "produccion": []
+                "tickets": {
+                    "entorno": t.environment,
+                    "mios": t.tickets.iter().filter(|x| x["mine"] == true).map(|x| json!({
+                        "numero": x["numero"], "asunto": x["asunto"], "estado": x["estado"],
+                        "prioridad": x["prioridad"], "slaVencido": x["slaVencido"]
+                    })).collect::<Vec<_>>(),
+                    "sinDueno": t.tickets.iter().filter(|x| x["atiende"].is_null() || x["atiende"] == "").map(|x| json!({
+                        "numero": x["numero"], "asunto": x["asunto"], "prioridad": x["prioridad"]
+                    })).collect::<Vec<_>>()
+                },
+                "produccion": p.services.iter().filter(|x| x["health"] != "ok" || !x["stale"].is_null()).map(|x| {
+                    let mut o = json!({
+                        "servicio": format!("{} / {}", x["projectName"].as_str().unwrap_or(""), x["serviceName"].as_str().unwrap_or("")),
+                        "salud": x["health"], "estado": x["status"]
+                    });
+                    let st = &x["stale"];
+                    if !st.is_null() {
+                        o["sinDesplegar"] = json!(if st["kind"] == "stuck" {
+                            format!("deploy trabado desde {}", st["since"].as_str().unwrap_or(""))
+                        } else {
+                            format!("Railway no desplegó {} «{}» (pusheado {})",
+                                st["commit"].as_str().unwrap_or(""), st["message"].as_str().unwrap_or(""), st["since"].as_str().unwrap_or(""))
+                        });
+                    }
+                    o
+                }).collect::<Vec<_>>()
             })
         }
     });

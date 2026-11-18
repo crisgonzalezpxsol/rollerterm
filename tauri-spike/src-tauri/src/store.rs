@@ -78,6 +78,55 @@ impl Store {
         self.write("notes.json", &Value::Array(notes.clone()))
     }
 
+    pub fn load_session(&self) -> Option<Value> {
+        let text = fs::read_to_string(self.dir.join("session.json")).ok()?;
+        let session: Value = serde_json::from_str(&text).ok()?;
+        // Primera vez o archivo sin pestañas: la ventana arranca con una nueva.
+        let has_tabs = session.get("tabs").and_then(Value::as_array).is_some_and(|t| !t.is_empty());
+        has_tabs.then_some(session)
+    }
+
+    /// Cambia solo las claves que vienen (como en Electron).
+    pub fn update_settings(&self, patch: Map<String, Value>) -> Result<Value, String> {
+        let mut s = self.settings.lock().unwrap();
+        if let Value::Object(m) = &mut *s {
+            m.extend(patch);
+        }
+        self.write("settings.json", &s)?;
+        Ok(s.clone())
+    }
+
+    /// Reemplaza todo (al importar); lo que falte queda por defecto.
+    pub fn replace_settings(&self, saved: Value) -> Result<Value, String> {
+        let next = with_defaults(saved);
+        *self.settings.lock().unwrap() = next.clone();
+        self.write("settings.json", &next)?;
+        Ok(next)
+    }
+
+    /// Suma notas importadas: las que ya están se quedan con la versión más nueva.
+    pub fn merge_notes(&self, incoming: Vec<Value>) -> Result<usize, String> {
+        let mut notes = self.notes.lock().unwrap();
+        let mut changed = 0;
+        for note in incoming {
+            match notes.iter_mut().find(|n| n.get("id") == note.get("id")) {
+                Some(existing) if updated_at(&note) > updated_at(existing) => {
+                    *existing = note;
+                    changed += 1;
+                }
+                Some(_) => {}
+                None => {
+                    notes.push(note);
+                    changed += 1;
+                }
+            }
+        }
+        if changed > 0 {
+            self.write("notes.json", &Value::Array(notes.clone()))?;
+        }
+        Ok(changed)
+    }
+
     /// Escritura atómica: un cierre a mitad de camino no deja el JSON roto.
     pub fn write(&self, name: &str, value: &Value) -> Result<(), String> {
         let path = self.dir.join(name);
@@ -122,11 +171,7 @@ fn with_defaults(saved: Value) -> Value {
 
 #[tauri::command]
 pub fn session_load(store: State<'_, Store>) -> Option<Value> {
-    let text = fs::read_to_string(store.dir.join("session.json")).ok()?;
-    let session: Value = serde_json::from_str(&text).ok()?;
-    // Primera vez o archivo sin pestañas: la ventana arranca con una nueva.
-    let has_tabs = session.get("tabs").and_then(Value::as_array).is_some_and(|t| !t.is_empty());
-    has_tabs.then_some(session)
+    store.load_session()
 }
 
 #[tauri::command]
@@ -142,15 +187,6 @@ pub fn settings_get(store: State<'_, Store>) -> Value {
     store.settings.lock().unwrap().clone()
 }
 
-#[tauri::command]
-pub fn settings_set(store: State<'_, Store>, patch: Map<String, Value>) -> Result<Value, String> {
-    let mut s = store.settings.lock().unwrap();
-    if let Value::Object(m) = &mut *s {
-        m.extend(patch);
-    }
-    store.write("settings.json", &s)?;
-    Ok(s.clone())
-}
 
 // ---------- notas ----------
 

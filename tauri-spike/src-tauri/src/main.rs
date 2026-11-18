@@ -6,15 +6,20 @@ mod assistant;
 mod bridge;
 mod calendar;
 mod claude_runner;
+mod config_io;
 mod mail;
+mod mcp_client;
 mod mcp_server;
 mod notify;
 mod pty;
+mod railway;
 mod reminders;
 mod rt_tools;
 mod shell_env;
 mod store;
 mod sysmon;
+mod tickets;
+mod usage;
 mod util;
 
 use assistant::Assistant;
@@ -23,7 +28,10 @@ use reminders::{Reminder, Reminders};
 use claude_runner::ClaudeRunner;
 use mail::{MailState, MailSync};
 use pty::Ptys;
-use serde_json::Value;
+use railway::{ProdState, RailwayMonitor};
+use tickets::{TicketsMonitor, TicketsState};
+use usage::{ClaudeUsage, UsageState};
+use serde_json::{Map, Value};
 use std::sync::Arc;
 use store::Store;
 use bridge::Bridge;
@@ -90,6 +98,78 @@ fn mail_summarize(mail: State<'_, Arc<MailSync>>) {
 #[tauri::command]
 fn mail_lists(mail: State<'_, Arc<MailSync>>, vip: Vec<String>, blocked: Vec<String>) {
     mail.set_lists(vip, blocked);
+}
+
+// ---------- configuración ----------
+
+#[tauri::command]
+fn settings_set(app: tauri::AppHandle, patch: Map<String, Value>) -> Result<Value, String> {
+    let railway = patch.contains_key("railway");
+    let tickets = patch.contains_key("tickets");
+    let next = app.state::<Store>().update_settings(patch)?;
+    // Cambiar qué se vigila se refleja en el indicador sin esperar al próximo ciclo.
+    if railway {
+        app.state::<Arc<RailwayMonitor>>().spawn_check();
+    }
+    if tickets {
+        app.state::<Arc<TicketsMonitor>>().spawn_check();
+    }
+    Ok(next)
+}
+
+/// Navegadores para abrir los links: en Linux se usa siempre el predeterminado (xdg-open).
+#[tauri::command]
+fn list_browsers() -> Vec<Value> {
+    vec![]
+}
+
+// ---------- tickets, Railway y uso de Claude ----------
+
+#[tauri::command]
+fn tickets_get(t: State<'_, Arc<TicketsMonitor>>) -> TicketsState {
+    t.current()
+}
+
+#[tauri::command]
+fn tickets_refresh(t: State<'_, Arc<TicketsMonitor>>) {
+    t.spawn_check();
+}
+
+/// El hilo completo de un ticket; con `action`, la aplica antes (comentar, estado, dueño).
+#[tauri::command]
+async fn tickets_view(t: State<'_, Arc<TicketsMonitor>>, numero: u64, action: Option<Value>) -> Result<Value, String> {
+    t.inner().clone().view(numero, action).await
+}
+
+/// Servidores MCP por stdio configurados en Claude Code (para elegir el de tickets).
+#[tauri::command]
+fn tickets_servers() -> Vec<String> {
+    mcp_client::list_servers().into_iter().map(|s| s.name).collect()
+}
+
+#[tauri::command]
+fn prod_get(p: State<'_, Arc<RailwayMonitor>>) -> ProdState {
+    p.current()
+}
+
+#[tauri::command]
+fn prod_refresh(p: State<'_, Arc<RailwayMonitor>>) {
+    p.spawn_check();
+}
+
+#[tauri::command]
+async fn prod_projects(p: State<'_, Arc<RailwayMonitor>>) -> Result<Vec<Value>, String> {
+    Ok(p.list_projects().await.unwrap_or_default())
+}
+
+#[tauri::command]
+fn usage_get(u: State<'_, Arc<ClaudeUsage>>) -> UsageState {
+    u.current()
+}
+
+#[tauri::command]
+fn usage_refresh(u: State<'_, Arc<ClaudeUsage>>) {
+    u.spawn_check();
 }
 
 // ---------- recordatorios ----------
@@ -202,8 +282,10 @@ fn main() {
                 bridge.clone(),
                 handle.clone(),
                 move || h.state::<Store>().settings()["assistant"]["model"].as_str().unwrap_or("sonnet").to_string(),
-                // El servidor MCP de tickets llega con la etapa 3 del port.
-                || None,
+                {
+                    let h = handle.clone();
+                    move || tickets::resolve_server(&h.state::<Store>().settings()["tickets"]).map(|s| s.name)
+                },
             );
             assistant.start()?;
             let (h, a) = (handle.clone(), assistant.clone());
@@ -219,7 +301,27 @@ fn main() {
                 },
             );
             reminders.start();
-            rt_tools::register(&bridge, handle.clone(), reminders.clone(), calendar.clone(), mail.clone());
+            let h = handle.clone();
+            let tickets = TicketsMonitor::new(move || h.state::<Store>().settings()["tickets"].clone(), handle.clone());
+            let h = handle.clone();
+            let prod = RailwayMonitor::new(move || h.state::<Store>().settings()["railway"].clone(), handle.clone());
+            let usage = ClaudeUsage::new(handle.clone());
+            tickets.start();
+            prod.start();
+            usage.start();
+            rt_tools::register(
+                &bridge,
+                handle.clone(),
+                reminders.clone(),
+                calendar.clone(),
+                mail.clone(),
+                tickets.clone(),
+                prod.clone(),
+            );
+
+            app.manage(tickets);
+            app.manage(prod);
+            app.manage(usage);
 
             app.manage(calendar);
             app.manage(mail);
@@ -236,7 +338,19 @@ fn main() {
             store::session_load,
             store::session_save,
             store::settings_get,
-            store::settings_set,
+            settings_set,
+            list_browsers,
+            tickets_get,
+            tickets_refresh,
+            tickets_view,
+            tickets_servers,
+            prod_get,
+            prod_refresh,
+            prod_projects,
+            usage_get,
+            usage_refresh,
+            config_io::config_export,
+            config_io::config_import,
             store::notes_list,
             store::notes_save,
             store::notes_delete,

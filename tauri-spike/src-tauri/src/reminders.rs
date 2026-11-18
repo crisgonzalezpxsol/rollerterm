@@ -82,6 +82,25 @@ impl Reminders {
         Ok(r)
     }
 
+    /// Suma recordatorios importados que todavía no pasaron y que no estaban.
+    pub fn merge(&self, incoming: Vec<Reminder>) -> usize {
+        let now = now_ms();
+        let added = {
+            let mut list = self.list.lock().unwrap();
+            let fresh: Vec<Reminder> = incoming
+                .into_iter()
+                .filter(|r| !r.done && r.when_ms() > now && !list.iter().any(|x| x.id == r.id))
+                .collect();
+            let n = fresh.len();
+            list.extend(fresh);
+            n
+        };
+        if added > 0 {
+            self.save();
+        }
+        added
+    }
+
     pub fn remove(&self, id: &str) -> bool {
         let removed = {
             let mut list = self.list.lock().unwrap();

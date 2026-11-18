@@ -191,6 +191,11 @@ impl MailSync {
         }
     }
 
+    pub fn lists(&self) -> (Vec<String>, Vec<String>) {
+        let s = self.store.lock().unwrap();
+        (s.vip.clone(), s.blocked.clone())
+    }
+
     pub fn set_lists(&self, vip: Vec<String>, blocked: Vec<String>) {
         let clean = |list: Vec<String>| {
             let mut seen = HashSet::new();
