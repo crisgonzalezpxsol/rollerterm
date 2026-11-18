@@ -142,6 +142,8 @@ export class ClaudeRunner {
       message,
       detail: this.describe(opts, out, message),
     });
+    // Un init sin ningún servidor MCP no prueba que falte el conector: es que no llegaron a cargar.
+    if (init && !init.mcp_servers?.length) return fail("error", "Claude Code arrancó sin cargar los conectores de claude.ai.");
     if (init && !server) return fail("not-configured", `Tu cuenta de Claude no tiene el conector de ${label}.`);
     if (server && server.status !== "connected" && server.status !== "pending") {
       return fail("disconnected", `El conector de ${label} está en estado "${server.status}".`);
@@ -208,7 +210,11 @@ export class ClaudeRunner {
     ];
     // El prompt va por stdin: --allowedTools y --disallowedTools aceptan varios valores y se
     // comerían un argumento suelto.
-    const { stdout, stderr, exitError } = await exec(bin, args, { env, cwd: app.getPath("userData"), input: prompt, timeoutMs });
+    // Desde Claude Code 2.1.x los conectores de claude.ai arrancan "fully async": el init sale
+    // sin ellos (ni siquiera como "pending") y el modelo responde sin la herramienta. Con esto
+    // apagado, el arranque los espera y figuran en el init.
+    const runEnv = { ...env, MCP_CONNECTION_NONBLOCKING: "0" };
+    const { stdout, stderr, exitError } = await exec(bin, args, { env: runEnv, cwd: app.getPath("userData"), input: prompt, timeoutMs });
     const messages = stdout.split("\n").flatMap((line) => {
       try {
         return [JSON.parse(line) as StreamMessage];
