@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
 
-const FILES: [&str; 3] = ["session.json", "settings.json", "notes.json"];
+const FILES: [&str; 4] = ["session.json", "settings.json", "notes.json", "mail.json"];
 
 fn config_home() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME")
@@ -19,8 +19,13 @@ fn config_home() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".config"))
 }
 
+/// Carpeta de datos de la versión Tauri.
+pub fn data_dir() -> PathBuf {
+    config_home().join("rollerterm-tauri")
+}
+
 pub struct Store {
-    dir: PathBuf,
+    pub dir: PathBuf,
     settings: Mutex<Value>,
     notes: Mutex<Vec<Value>>,
     /// Última sesión que mandó la ventana: al cerrar se le actualizan las carpetas.
@@ -29,7 +34,7 @@ pub struct Store {
 
 impl Store {
     pub fn open() -> Store {
-        let dir = config_home().join("rollerterm-tauri");
+        let dir = data_dir();
         let _ = fs::create_dir_all(&dir);
         let electron = config_home().join("rollerterm");
         for f in FILES {

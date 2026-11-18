@@ -5,9 +5,7 @@
 // notas y links. El resto (correo, agenda, tickets, asistente, Railway, uso de Claude,
 // recordatorios, exportar/importar) responde «no disponible todavía» hasta portarlo.
 import type {
-  CalendarState,
   Conversation,
-  MailState,
   MenuCommand,
   ProdState,
   RollertermApi,
@@ -18,6 +16,9 @@ import type {
 type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
 const { invoke, Channel } = (window as any).__TAURI__.core;
+const { listen } = (window as any).__TAURI__.event;
+/** Eventos que manda Rust (estado de la agenda, del correo…). */
+const on = <T>(name: string, cb: (payload: T) => void) => void listen(name, (e: { payload: T }) => cb(e.payload));
 
 // Errores de la ventana a la consola del proceso Rust (en release no hay devtools).
 const report = (msg: string) => void invoke("js_log", { message: msg }).catch(noopErr);
@@ -33,20 +34,6 @@ let dataCb: (id: string, data: string) => void = noop;
 let exitCb: (id: string, code: number) => void = noop;
 let menuCb: (cmd: MenuCommand) => void = noop;
 
-const calendar: CalendarState = { status: "error", events: [], lastSync: null, message: PENDING, detail: null, syncing: false };
-const mail: MailState = {
-  status: "error",
-  message: PENDING,
-  detail: null,
-  syncing: false,
-  summarizing: false,
-  lastSync: null,
-  threads: [],
-  vip: [],
-  blocked: [],
-  summary: null,
-  summaryError: null,
-};
 // "disabled" oculta esos indicadores en vez de mostrarlos rotos.
 const tickets: TicketsState = { status: "disabled", message: PENDING, checking: false, lastCheck: null, tickets: [], webUrl: null, environment: null };
 const prod: ProdState = { status: "disabled", message: PENDING, checking: false, lastCheck: null, services: [] };
@@ -93,16 +80,16 @@ const api: RollertermApi = {
   onRemindersChanged: noop,
   onReminder: noop,
 
-  // ---------- agenda y correo (pendiente) ----------
-  getCalendar: () => Promise.resolve(calendar),
-  refreshCalendar: noop,
-  onCalendar: noop,
-  getMail: () => Promise.resolve(mail),
-  refreshMail: noop,
-  summarizeMail: noop,
-  setMailLists: noop,
-  onMail: noop,
-  onNewMail: noop,
+  // ---------- agenda y correo ----------
+  getCalendar: () => invoke("calendar_get"),
+  refreshCalendar: () => void invoke("calendar_refresh"),
+  onCalendar: (cb) => on("calendar:state", cb),
+  getMail: () => invoke("mail_get"),
+  refreshMail: () => void invoke("mail_refresh"),
+  summarizeMail: () => void invoke("mail_summarize"),
+  setMailLists: (vip, blocked) => void invoke("mail_lists", { vip, blocked }),
+  onMail: (cb) => on("mail:state", cb),
+  onNewMail: (cb) => on("mail:new", cb),
 
   // ---------- tickets, Railway y uso de Claude (pendiente) ----------
   getTickets: () => Promise.resolve(tickets),
@@ -133,6 +120,27 @@ const api: RollertermApi = {
 };
 
 window.rollerterm = api;
+
+// Notificaciones nativas: WebKitGTK no muestra las de la página. Mismo uso que la API web
+// (new Notification(título, { body }) y onclick), pero las muestra Rust.
+const pending = new Map<number, { onclick: (() => void) | null }>();
+let nextNotification = 1;
+class NativeNotification {
+  static permission = "granted";
+  static requestPermission = () => Promise.resolve("granted");
+  onclick: (() => void) | null = null;
+  constructor(title: string, opts?: { body?: string }) {
+    const id = nextNotification++;
+    pending.set(id, this);
+    void invoke("notify", { id, title, body: opts?.body ?? "" });
+  }
+  close() {}
+}
+on<number>("notify:click", (id) => {
+  pending.get(id)?.onclick?.();
+  pending.delete(id);
+});
+Object.assign(window, { Notification: NativeNotification });
 
 // WebKitGTK no trae speechSynthesis (la voz del asistente): uno vacío, sin voces,
 // para que la interfaz arranque. Se resuelve al portar el asistente.
