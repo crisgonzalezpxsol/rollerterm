@@ -3,7 +3,8 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute } from "node:path";
+import { existsSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
 import { findCommand } from "./shell-env";
 
 export interface McpServerConfig {
@@ -11,20 +12,45 @@ export interface McpServerConfig {
   command: string;
   args: string[];
   env: Record<string, string>;
+  /** Carpeta del proyecto, para los servidores de proyecto: se lanzan parados ahí (sus rutas pueden ser relativas). */
+  cwd?: string;
 }
 
-/** Servidores MCP por stdio configurados a nivel usuario en Claude Code. */
-export async function listMcpServers(): Promise<McpServerConfig[]> {
+type RawServers = Record<string, { type?: string; command?: string; args?: string[]; env?: Record<string, string> }>;
+
+function stdioServers(servers: RawServers | undefined, cwd?: string): McpServerConfig[] {
+  return Object.entries(servers ?? {}).flatMap(([name, c]) =>
+    c.command && (!c.type || c.type === "stdio") ? [{ name, command: c.command, args: c.args ?? [], env: c.env ?? {}, cwd }] : [],
+  );
+}
+
+async function readJson<T>(path: string): Promise<T | null> {
   try {
-    const parsed = JSON.parse(await readFile(`${homedir()}/.claude.json`, "utf8")) as {
-      mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; env?: Record<string, string> }>;
-    };
-    return Object.entries(parsed.mcpServers ?? {}).flatMap(([name, c]) =>
-      c.command && (!c.type || c.type === "stdio") ? [{ name, command: c.command, args: c.args ?? [], env: c.env ?? {} }] : [],
-    );
+    return JSON.parse(await readFile(path, "utf8")) as T;
   } catch {
-    return [];
+    return null;
   }
+}
+
+/**
+ * Servidores MCP por stdio configurados en Claude Code: los de cada proyecto (alcance local, en
+ * ~/.claude.json, y el .mcp.json del repo) y los de usuario. Con la prioridad de Claude Code
+ * (local, proyecto, usuario); si un nombre se repite, queda el primero.
+ */
+export async function listMcpServers(): Promise<McpServerConfig[]> {
+  const parsed = await readJson<{ mcpServers?: RawServers; projects?: Record<string, { mcpServers?: RawServers }> }>(
+    `${homedir()}/.claude.json`,
+  );
+  if (!parsed) return [];
+  const projects = Object.entries(parsed.projects ?? {}).filter(([dir]) => existsSync(dir));
+  const local = projects.flatMap(([dir, p]) => stdioServers(p.mcpServers, dir));
+  const shared: McpServerConfig[] = [];
+  for (const [dir] of projects) {
+    const file = await readJson<{ mcpServers?: RawServers }>(join(dir, ".mcp.json"));
+    shared.push(...stdioServers(file?.mcpServers, dir));
+  }
+  const seen = new Set<string>();
+  return [...local, ...shared, ...stdioServers(parsed.mcpServers)].filter((s) => !seen.has(s.name) && Boolean(seen.add(s.name)));
 }
 
 /** "${VAR}" → valor del entorno, como hace Claude Code al lanzar el servidor. */
@@ -46,7 +72,7 @@ export async function withMcp<T>(cfg: McpServerConfig, fn: (call: CallTool) => P
   if (!bin) throw new Error(`No se encontró el comando «${cfg.command}» del servidor MCP ${cfg.name}.`);
   const env = { ...baseEnv, ...Object.fromEntries(Object.entries(cfg.env).map(([k, v]) => [k, expand(v, baseEnv)])) };
 
-  const child = spawn(bin, cfg.args, { env, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn(bin, cfg.args, { env, cwd: cfg.cwd, stdio: ["pipe", "pipe", "pipe"] });
   let stderr = "";
   child.stderr.on("data", (d: Buffer) => (stderr = (stderr + d.toString()).slice(-2000)));
 

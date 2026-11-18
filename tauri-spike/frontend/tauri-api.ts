@@ -11,6 +11,13 @@ const { invoke, Channel } = (window as any).__TAURI__.core;
 const { listen } = (window as any).__TAURI__.event;
 /** Eventos que manda Rust (estado de la agenda, del correo…). */
 const on = <T>(name: string, cb: (payload: T) => void) => void listen(name, (e: { payload: T }) => cb(e.payload));
+/**
+ * Igual que `on`, para los estados que Rust va publicando (agenda, correo, tickets…). Registrar
+ * el listener es asíncrono: si Rust publicó justo antes, ese aviso se perdería. Por eso, ya
+ * registrado, se pide el estado actual una vez más (en Electron el registro es inmediato).
+ */
+const onState = <T>(name: string, getter: string, cb: (payload: T) => void) =>
+  void listen(name, (e: { payload: T }) => cb(e.payload)).then(() => invoke(getter).then(cb));
 
 // Errores de la ventana a la consola del proceso Rust (en release no hay devtools).
 const report = (msg: string) => void invoke("js_log", { message: msg }).catch(noopErr);
@@ -67,12 +74,12 @@ const api: RollertermApi = {
   // ---------- agenda y correo ----------
   getCalendar: () => invoke("calendar_get"),
   refreshCalendar: () => void invoke("calendar_refresh"),
-  onCalendar: (cb) => on("calendar:state", cb),
+  onCalendar: (cb) => onState("calendar:state", "calendar_get", cb),
   getMail: () => invoke("mail_get"),
   refreshMail: () => void invoke("mail_refresh"),
   summarizeMail: () => void invoke("mail_summarize"),
   setMailLists: (vip, blocked) => void invoke("mail_lists", { vip, blocked }),
-  onMail: (cb) => on("mail:state", cb),
+  onMail: (cb) => onState("mail:state", "mail_get", cb),
   onNewMail: (cb) => on("mail:new", cb),
 
   // ---------- tickets, Railway y uso de Claude ----------
@@ -80,15 +87,15 @@ const api: RollertermApi = {
   refreshTickets: () => void invoke("tickets_refresh"),
   viewTicket: (numero) => invoke("tickets_view", { numero, action: null }),
   ticketAction: (numero, action) => invoke("tickets_view", { numero, action }),
-  onTickets: (cb) => on("tickets:state", cb),
+  onTickets: (cb) => onState("tickets:state", "tickets_get", cb),
   listMcpServers: () => invoke("tickets_servers"),
   getProd: () => invoke("prod_get"),
   refreshProd: () => void invoke("prod_refresh"),
-  onProd: (cb) => on("prod:state", cb),
+  onProd: (cb) => onState("prod:state", "prod_get", cb),
   listRailwayProjects: () => invoke("prod_projects"),
   getUsage: () => invoke("usage_get"),
   refreshUsage: () => void invoke("usage_refresh"),
-  onUsage: (cb) => on("usage:state", cb),
+  onUsage: (cb) => onState("usage:state", "usage_get", cb),
 
   // ---------- asistente ----------
   chatList: () => invoke("chat_list"),

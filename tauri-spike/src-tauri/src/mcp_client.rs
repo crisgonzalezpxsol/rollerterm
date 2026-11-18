@@ -20,18 +20,12 @@ pub struct ServerConfig {
     pub command: String,
     pub args: Vec<String>,
     pub env: HashMap<String, String>,
+    /// Carpeta del proyecto, para los servidores de proyecto: se lanzan parados ahí (sus rutas pueden ser relativas).
+    pub cwd: Option<String>,
 }
 
-/// Servidores MCP por stdio configurados a nivel usuario en Claude Code.
-pub fn list_servers() -> Vec<ServerConfig> {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let Some(parsed) = std::fs::read_to_string(format!("{home}/.claude.json"))
-        .ok()
-        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
-    else {
-        return vec![];
-    };
-    parsed["mcpServers"]
+fn stdio_servers(servers: &Value, cwd: Option<&str>) -> Vec<ServerConfig> {
+    servers
         .as_object()
         .into_iter()
         .flatten()
@@ -48,9 +42,39 @@ pub fn list_servers() -> Vec<ServerConfig> {
                     .flatten()
                     .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_string())))
                     .collect(),
+                cwd: cwd.map(String::from),
             })
         })
         .collect()
+}
+
+fn read_json(path: &std::path::Path) -> Option<Value> {
+    serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
+}
+
+/// Servidores MCP por stdio configurados en Claude Code: los de cada proyecto (alcance local, en
+/// ~/.claude.json, y el .mcp.json del repo) y los de usuario. Con la prioridad de Claude Code
+/// (local, proyecto, usuario); si un nombre se repite, queda el primero.
+pub fn list_servers() -> Vec<ServerConfig> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let Some(parsed) = read_json(std::path::Path::new(&format!("{home}/.claude.json"))) else {
+        return vec![];
+    };
+    let projects: Vec<(&String, &Value)> = parsed["projects"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(dir, _)| std::path::Path::new(dir).is_dir())
+        .collect();
+    let mut all: Vec<ServerConfig> = projects.iter().flat_map(|(dir, p)| stdio_servers(&p["mcpServers"], Some(dir))).collect();
+    for (dir, _) in &projects {
+        if let Some(file) = read_json(&std::path::Path::new(dir).join(".mcp.json")) {
+            all.extend(stdio_servers(&file["mcpServers"], Some(dir)));
+        }
+    }
+    all.extend(stdio_servers(&parsed["mcpServers"], None));
+    let mut seen = std::collections::HashSet::new();
+    all.into_iter().filter(|s| seen.insert(s.name.clone())).collect()
 }
 
 /// "${VAR}" → valor del entorno, como hace Claude Code al lanzar el servidor.
@@ -102,16 +126,18 @@ impl Session {
         for (k, v) in &cfg.env {
             env.insert(k.clone(), expand(v, &base_env));
         }
-        let mut child = tokio::process::Command::new(&bin)
-            .args(&cfg.args)
+        let mut cmd = tokio::process::Command::new(&bin);
+        cmd.args(&cfg.args)
             .env_clear()
             .envs(&env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()
-            .map_err(|e| format!("No se pudo lanzar el servidor MCP {}: {e}", cfg.name))?;
+            .kill_on_drop(true);
+        if let Some(dir) = &cfg.cwd {
+            cmd.current_dir(dir);
+        }
+        let mut child = cmd.spawn().map_err(|e| format!("No se pudo lanzar el servidor MCP {}: {e}", cfg.name))?;
 
         let stderr_buf = Arc::new(Mutex::new(String::new()));
         let mut stderr = child.stderr.take().unwrap();
