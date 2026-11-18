@@ -18,6 +18,7 @@ import { mountProd } from "./prod";
 import { mountSettings } from "./settings";
 import { mountTickets } from "./tickets";
 import { mountUsage } from "./usage";
+import { CLOSE_KEY, NEW_KEY } from "./keys";
 
 declare global {
   interface Window {
@@ -50,6 +51,7 @@ interface Tab {
 const tabsEl = document.getElementById("tabs") as HTMLDivElement;
 const panesEl = document.getElementById("panes") as HTMLDivElement;
 const newTabBtn = document.getElementById("new-tab") as HTMLButtonElement;
+newTabBtn.title = `Nueva pestaña: elegí la carpeta (${NEW_KEY})`;
 // Configuración local para lo que se lee a cada rato (sonido del pomodoro); se actualiza
 // al arrancar y con cada cambio en la ventana de configuración.
 let settings: Settings | null = null;
@@ -172,7 +174,7 @@ function createTab(opts: { id?: string; name?: string; cwd?: string; sectorId?: 
   const closeBtn = document.createElement("button");
   closeBtn.className = "close";
   closeBtn.textContent = "×";
-  closeBtn.title = "Cerrar (⌘W)";
+  closeBtn.title = `Cerrar (${CLOSE_KEY})`;
   const claudeEl = document.createElement("span");
   claudeEl.className = "tab-claude";
   tabEl.append(textEl, claudeEl, closeBtn);
@@ -721,7 +723,7 @@ api.onExit((id, code) => {
   if (!tab) return;
   tab.alive = false;
   tab.tabEl.classList.add("ended");
-  tab.term.write(`\r\n\x1b[2m[proceso terminado (código ${code}) — Enter para reabrir, ⌘W para cerrar]\x1b[0m\r\n`);
+  tab.term.write(`\r\n\x1b[2m[proceso terminado (código ${code}) — Enter para reabrir, ${CLOSE_KEY} para cerrar]\x1b[0m\r\n`);
 });
 
 api.onMenu((cmd: MenuCommand) => {

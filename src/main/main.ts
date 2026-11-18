@@ -202,6 +202,7 @@ function send(cmd: MenuCommand) {
 }
 
 function buildMenu() {
+  // En Linux, Ctrl+W y Ctrl+T son de la shell (borrar palabra, intercambiar letras): nueva y cerrar pestaña van con Ctrl+Shift, como en las terminales.
   const gotoItems: MenuItemConstructorOptions[] = Array.from({ length: 9 }, (_, i) => ({
     label: `Ir a la pestaña ${i + 1}`,
     accelerator: `CmdOrCtrl+${i + 1}`,
@@ -230,9 +231,9 @@ function buildMenu() {
     {
       label: "Pestañas",
       submenu: [
-        { label: "Nueva pestaña…", accelerator: "CmdOrCtrl+T", click: () => send("new-tab") },
+        { label: "Nueva pestaña…", accelerator: process.platform === "darwin" ? "Cmd+T" : "Ctrl+Shift+T", click: () => send("new-tab") },
         { label: "Renombrar pestaña", accelerator: "CmdOrCtrl+Shift+R", click: () => send("rename-tab") },
-        { label: "Cerrar pestaña", accelerator: "CmdOrCtrl+W", click: () => send("close-tab") },
+        { label: "Cerrar pestaña", accelerator: process.platform === "darwin" ? "Cmd+W" : "Ctrl+Shift+W", click: () => send("close-tab") },
         { type: "separator" },
         { label: "Pestaña siguiente", accelerator: "CmdOrCtrl+Shift+]", click: () => send("next-tab") },
         { label: "Pestaña anterior", accelerator: "CmdOrCtrl+Shift+[", click: () => send("prev-tab") },

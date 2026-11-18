@@ -6,6 +6,7 @@ import { showContextMenu } from "./context-menu";
 import { renderMarkdown } from "./markdown";
 import { isMuted, notify } from "./notify";
 import { speak, stopSpeaking } from "./speech";
+import { NEW_KEY } from "./keys";
 
 export interface AssistantPanel {
   toggle(): void;
@@ -61,7 +62,7 @@ export function mountAssistant(api: RollertermApi, hooks: { onOpen: () => void; 
     </header>
     <nav class="as-convs">
       <div class="as-conv-list"></div>
-      <button class="as-conv-new" title="Conversación nueva (⌘T con el foco en el chat)">+</button>
+      <button class="as-conv-new" title="Conversación nueva (${NEW_KEY} con el foco en el chat)">+</button>
     </nav>
     <div class="as-logs"></div>
     <form class="as-composer">
