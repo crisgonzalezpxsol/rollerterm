@@ -17,6 +17,8 @@ tokio = { version = "1", features = ["process", "time", "io-util", "sync", "macr
 chrono = "0.4"
 notify-rust = "4"
 uuid = { version = "1", features = ["v4"] }
+tiny_http = "0.12"
+ureq = "2"
 
 # Binario lo más chico posible: es justamente lo que queremos medir.
 [profile.release]

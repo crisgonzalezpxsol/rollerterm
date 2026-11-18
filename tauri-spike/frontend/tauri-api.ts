@@ -2,10 +2,9 @@
 // sobre comandos de Rust, así src/renderer/ corre sin cambios.
 //
 // Ya portado: terminales, sesión (pestañas y sectores), configuración, selector de carpetas,
-// notas y links. El resto (correo, agenda, tickets, asistente, Railway, uso de Claude,
-// recordatorios, exportar/importar) responde «no disponible todavía» hasta portarlo.
+// notas, links, agenda, correo, notificaciones, recordatorios y asistente. Lo que falta
+// (tickets, Railway, uso de Claude, exportar/importar) responde «no disponible todavía».
 import type {
-  Conversation,
   MenuCommand,
   ProdState,
   RollertermApi,
@@ -37,7 +36,6 @@ let menuCb: (cmd: MenuCommand) => void = noop;
 // "disabled" oculta esos indicadores en vez de mostrarlos rotos.
 const tickets: TicketsState = { status: "disabled", message: PENDING, checking: false, lastCheck: null, tickets: [], webUrl: null, environment: null };
 const prod: ProdState = { status: "disabled", message: PENDING, checking: false, lastCheck: null, services: [] };
-const daily: Conversation = { id: "daily", title: "Jornada", createdAt: Date.now(), updatedAt: Date.now(), daily: true, busy: false };
 const zero = { cost: 0, input: 0, output: 0, cacheWrite: 0, cacheRead: 0, messages: 0 };
 const usage: UsageState = { status: "error", lastCheck: null, today: zero, week: zero, block: null, models: [], projects: [] };
 
@@ -71,14 +69,14 @@ const api: RollertermApi = {
   listNotes: () => invoke("notes_list"),
   saveNote: (note) => invoke("notes_save", { note }),
   deleteNote: (id) => invoke("notes_delete", { id }),
-  onNotesChanged: noop,
+  onNotesChanged: (cb) => on("notes:changed", () => cb()),
 
-  // ---------- recordatorios (pendiente) ----------
-  listReminders: () => Promise.resolve([]),
-  addReminder: notYet,
-  removeReminder: () => Promise.resolve(false),
-  onRemindersChanged: noop,
-  onReminder: noop,
+  // ---------- recordatorios ----------
+  listReminders: () => invoke("reminders_list"),
+  addReminder: (when, text, noteId) => invoke("reminders_add", { when, text, noteId: noteId ?? null }),
+  removeReminder: (id) => invoke("reminders_remove", { id }),
+  onRemindersChanged: (cb) => on("reminders:changed", () => cb()),
+  onReminder: (cb) => on("reminder:fire", cb),
 
   // ---------- agenda y correo ----------
   getCalendar: () => invoke("calendar_get"),
@@ -106,17 +104,16 @@ const api: RollertermApi = {
   refreshUsage: noop,
   onUsage: noop,
 
-  // ---------- asistente (pendiente) ----------
-  // La interfaz espera al menos la «Jornada»: una sola, con el aviso de que falta portarlo.
-  chatList: () => Promise.resolve([daily]),
-  chatNew: notYet,
-  chatRename: notYet,
-  chatDelete: notYet,
-  chatHistory: () => Promise.resolve([{ id: "pendiente", role: "event", text: `El asistente: ${PENDING}`, at: Date.now() }]),
-  chatSend: notYet,
-  chatStop: noop,
-  chatApprove: noop,
-  onChat: noop,
+  // ---------- asistente ----------
+  chatList: () => invoke("chat_list"),
+  chatNew: () => invoke("chat_new"),
+  chatRename: (convId, title) => invoke("chat_rename", { convId, title }),
+  chatDelete: (convId) => invoke("chat_delete", { convId }),
+  chatHistory: (convId) => invoke("chat_history", { convId }),
+  chatSend: (convId, text) => invoke("chat_send", { convId, text }),
+  chatStop: (convId) => void invoke("chat_stop", { convId }),
+  chatApprove: (id, approved) => void invoke("chat_approve", { id, approved }),
+  onChat: (cb) => on("chat:event", cb),
 };
 
 window.rollerterm = api;

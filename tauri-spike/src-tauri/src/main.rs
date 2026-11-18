@@ -2,24 +2,32 @@
 // reemplaza a src/main/ de Electron, módulo por módulo.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod assistant;
+mod bridge;
 mod calendar;
 mod claude_runner;
 mod mail;
+mod mcp_server;
 mod notify;
 mod pty;
+mod reminders;
+mod rt_tools;
 mod shell_env;
 mod store;
 mod sysmon;
 mod util;
 
+use assistant::Assistant;
 use calendar::{CalendarState, CalendarSync};
+use reminders::{Reminder, Reminders};
 use claude_runner::ClaudeRunner;
 use mail::{MailState, MailSync};
 use pty::Ptys;
 use serde_json::Value;
 use std::sync::Arc;
 use store::Store;
-use tauri::{Manager, State, WindowEvent};
+use bridge::Bridge;
+use tauri::{Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::DialogExt;
 use util::Activity;
 
@@ -84,6 +92,66 @@ fn mail_lists(mail: State<'_, Arc<MailSync>>, vip: Vec<String>, blocked: Vec<Str
     mail.set_lists(vip, blocked);
 }
 
+// ---------- recordatorios ----------
+
+#[tauri::command]
+fn reminders_list(r: State<'_, Arc<Reminders>>) -> Vec<Reminder> {
+    r.all()
+}
+
+#[tauri::command]
+fn reminders_add(r: State<'_, Arc<Reminders>>, when: String, text: String, note_id: Option<String>) -> Result<Reminder, String> {
+    r.add(&when, &text, note_id)
+}
+
+#[tauri::command]
+fn reminders_remove(r: State<'_, Arc<Reminders>>, id: String) -> bool {
+    r.remove(&id)
+}
+
+// ---------- asistente ----------
+
+#[tauri::command]
+fn chat_list(a: State<'_, Arc<Assistant>>) -> Vec<Value> {
+    a.list()
+}
+
+#[tauri::command]
+fn chat_new(a: State<'_, Arc<Assistant>>) -> Value {
+    a.create()
+}
+
+#[tauri::command]
+fn chat_rename(a: State<'_, Arc<Assistant>>, conv_id: String, title: String) {
+    a.rename(&conv_id, &title);
+}
+
+#[tauri::command]
+fn chat_delete(a: State<'_, Arc<Assistant>>, conv_id: String) -> Result<(), String> {
+    a.remove(&conv_id)
+}
+
+#[tauri::command]
+fn chat_history(a: State<'_, Arc<Assistant>>, conv_id: String) -> Vec<Value> {
+    a.history(&conv_id)
+}
+
+/// Igual que en Electron, la promesa se resuelve cuando termina la respuesta.
+#[tauri::command]
+async fn chat_send(a: State<'_, Arc<Assistant>>, conv_id: String, text: String) -> Result<(), String> {
+    a.inner().clone().send(conv_id, text).await
+}
+
+#[tauri::command]
+fn chat_stop(a: State<'_, Arc<Assistant>>, conv_id: String) {
+    a.stop(&conv_id);
+}
+
+#[tauri::command]
+fn chat_approve(a: State<'_, Arc<Assistant>>, id: String, approved: bool) {
+    a.approve(&id, approved);
+}
+
 /// Al cerrar, guarda en qué directorio quedó cada shell para reabrirla ahí.
 fn save_with_current_cwds(app: &tauri::AppHandle) {
     let store = app.state::<Store>();
@@ -103,6 +171,11 @@ fn save_with_current_cwds(app: &tauri::AppHandle) {
 }
 
 fn main() {
+    // Claude Code lanza este mismo binario como servidor MCP del asistente.
+    if std::env::args().any(|a| a == "--mcp") {
+        mcp_server::run();
+        return;
+    }
     let store = Store::open();
     let dir = store.dir.clone();
     let activity = Arc::new(Activity::new());
@@ -117,11 +190,41 @@ fn main() {
         .setup(move |app| {
             let handle = app.handle().clone();
             let calendar = CalendarSync::new(claude.clone(), handle.clone());
-            let mail = MailSync::new(&dir, claude.clone(), activity.clone(), handle);
+            let mail = MailSync::new(&dir, claude.clone(), activity.clone(), handle.clone());
             calendar.start();
             mail.start();
+
+            let bridge = Bridge::start();
+            let h = handle.clone();
+            let assistant = Assistant::new(
+                dir.join("asistente"),
+                claude.clone(),
+                bridge.clone(),
+                handle.clone(),
+                move || h.state::<Store>().settings()["assistant"]["model"].as_str().unwrap_or("sonnet").to_string(),
+                // El servidor MCP de tickets llega con la etapa 3 del port.
+                || None,
+            );
+            assistant.start()?;
+            let (h, a) = (handle.clone(), assistant.clone());
+            let h2 = handle.clone();
+            let reminders = Reminders::new(
+                &dir,
+                move |r| {
+                    let _ = h.emit("reminder:fire", &r);
+                    a.add_event(&format!("⏰ Recordatorio: {}", r.text));
+                },
+                move || {
+                    let _ = h2.emit("reminders:changed", ());
+                },
+            );
+            reminders.start();
+            rt_tools::register(&bridge, handle.clone(), reminders.clone(), calendar.clone(), mail.clone());
+
             app.manage(calendar);
             app.manage(mail);
+            app.manage(assistant);
+            app.manage(reminders);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -144,6 +247,17 @@ fn main() {
             mail_summarize,
             mail_lists,
             notify::notify,
+            reminders_list,
+            reminders_add,
+            reminders_remove,
+            chat_list,
+            chat_new,
+            chat_rename,
+            chat_delete,
+            chat_history,
+            chat_send,
+            chat_stop,
+            chat_approve,
             sysmon::sys_stats,
             pick_folder,
             open_url,

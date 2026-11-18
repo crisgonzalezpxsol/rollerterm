@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
 
-const FILES: [&str; 4] = ["session.json", "settings.json", "notes.json", "mail.json"];
+const FILES: [&str; 5] = ["session.json", "settings.json", "notes.json", "mail.json", "reminders.json"];
 
 fn config_home() -> PathBuf {
     std::env::var_os("XDG_CONFIG_HOME")
@@ -42,6 +42,10 @@ impl Store {
                 let _ = fs::copy(electron.join(f), dir.join(f));
             }
         }
+        // La memoria del asistente (memoria.md, diario, conversaciones), sin los cachés.
+        if !dir.join("asistente").exists() && electron.join("asistente").is_dir() {
+            copy_dir(&electron.join("asistente"), &dir.join("asistente"));
+        }
         let read = |f: &str| -> Option<Value> {
             serde_json::from_str(&fs::read_to_string(dir.join(f)).ok()?).ok()
         };
@@ -51,6 +55,27 @@ impl Store {
             _ => vec![],
         };
         Store { settings: Mutex::new(settings), notes: Mutex::new(notes), last_session: Mutex::new(None), dir }
+    }
+
+    /// Configuración actual (para los módulos de Rust que la necesitan).
+    pub fn settings(&self) -> Value {
+        self.settings.lock().unwrap().clone()
+    }
+
+    pub fn all_notes(&self) -> Vec<Value> {
+        let mut notes = self.notes.lock().unwrap().clone();
+        notes.sort_by(|a, b| updated_at(b).total_cmp(&updated_at(a)));
+        notes
+    }
+
+    pub fn save_note(&self, note: Value) -> Result<(), String> {
+        let mut notes = self.notes.lock().unwrap();
+        let id = note.get("id").cloned();
+        match notes.iter_mut().find(|n| n.get("id") == id.as_ref()) {
+            Some(existing) => *existing = note,
+            None => notes.push(note),
+        }
+        self.write("notes.json", &Value::Array(notes.clone()))
     }
 
     /// Escritura atómica: un cierre a mitad de camino no deja el JSON roto.
@@ -135,20 +160,12 @@ fn updated_at(n: &Value) -> f64 {
 
 #[tauri::command]
 pub fn notes_list(store: State<'_, Store>) -> Vec<Value> {
-    let mut notes = store.notes.lock().unwrap().clone();
-    notes.sort_by(|a, b| updated_at(b).total_cmp(&updated_at(a)));
-    notes
+    store.all_notes()
 }
 
 #[tauri::command]
 pub fn notes_save(store: State<'_, Store>, note: Value) -> Result<(), String> {
-    let mut notes = store.notes.lock().unwrap();
-    let id = note.get("id").cloned();
-    match notes.iter_mut().find(|n| n.get("id") == id.as_ref()) {
-        Some(existing) => *existing = note,
-        None => notes.push(note),
-    }
-    store.write("notes.json", &Value::Array(notes.clone()))
+    store.save_note(note)
 }
 
 #[tauri::command]
@@ -156,4 +173,17 @@ pub fn notes_delete(store: State<'_, Store>, id: String) -> Result<(), String> {
     let mut notes = store.notes.lock().unwrap();
     notes.retain(|n| n.get("id").and_then(Value::as_str) != Some(id.as_str()));
     store.write("notes.json", &Value::Array(notes.clone()))
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    let _ = fs::create_dir_all(to);
+    for entry in fs::read_dir(from).into_iter().flatten().flatten() {
+        let path = entry.path();
+        let dest = to.join(entry.file_name());
+        if path.is_dir() {
+            copy_dir(&path, &dest);
+        } else {
+            let _ = fs::copy(&path, &dest);
+        }
+    }
 }
