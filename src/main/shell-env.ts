@@ -27,7 +27,7 @@ export interface Command {
 export async function findCommand(name: string): Promise<Command | null> {
   const env = { ...process.env };
   for (const v of INHERITED_CLAUDE_VARS) delete env[v];
-  const shell = process.env.SHELL || "/bin/zsh";
+  const shell = process.env.SHELL || (process.platform === "darwin" ? "/bin/zsh" : "/bin/bash");
   const { stdout } = await exec(shell, ["-ilc", `printf "__RT__%s__RT__%s__RT__" "$PATH" "$(command -v ${name})"`], {
     env,
     timeoutMs: 15_000,

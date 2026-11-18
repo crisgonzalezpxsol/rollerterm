@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { readlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import * as pty from "node-pty";
 
@@ -14,7 +15,7 @@ export class PtyManager {
 
   create(id: string, cwd: string, cols: number, rows: number): void {
     this.kill(id);
-    const shell = process.env.SHELL || "/bin/zsh";
+    const shell = process.env.SHELL || (process.platform === "darwin" ? "/bin/zsh" : "/bin/bash");
     const dir = cwd && existsSync(cwd) ? cwd : homedir();
     // Shell de login (-l) para que cargue el PATH y los alias igual que Terminal.app.
     const proc = pty.spawn(shell, ["-l"], {
@@ -54,10 +55,11 @@ export class PtyManager {
     for (const id of [...this.ptys.keys()]) this.kill(id);
   }
 
-  /** Directorio actual de la shell (macOS no lo expone en /proc, se le pregunta a lsof). */
+  /** Directorio actual de la shell (en Linux sale de /proc; macOS no lo expone ahí y se le pregunta a lsof). */
   getCwd(id: string): Promise<string | null> {
     const proc = this.ptys.get(id);
     if (!proc) return Promise.resolve(null);
+    if (process.platform === "linux") return readlink(`/proc/${proc.pid}/cwd`).catch(() => null);
     return new Promise((resolve) => {
       execFile("lsof", ["-a", "-p", String(proc.pid), "-d", "cwd", "-Fn"], (err, stdout) => {
         if (err) return resolve(null);

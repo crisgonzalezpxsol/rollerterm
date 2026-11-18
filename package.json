@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "icon": "npx electron scripts/render-icon.cjs",
     "dist": "node build.mjs && electron-builder --mac dir && codesign --force --deep --sign - out/mac-*/rollerterm.app",
-    "install-app": "npm run dist && rm -rf /Applications/rollerterm.app && ditto out/mac-*/rollerterm.app /Applications/rollerterm.app"
+    "install-app": "npm run dist && rm -rf /Applications/rollerterm.app && ditto out/mac-*/rollerterm.app /Applications/rollerterm.app",
+    "dist:linux": "node build.mjs && electron-builder --linux dir",
+    "install-linux": "npm run dist:linux && sh scripts/install-linux.sh"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.1",
@@ -55,6 +57,12 @@
         "NSAppleEventsUsageDescription": "rollerterm abre enlaces y apps.",
         "NSMicrophoneUsageDescription": "Las apps que corrés en la terminal pueden pedir el micrófono."
       }
+    },
+    "linux": {
+      "target": "dir",
+      "icon": "assets/icon.png",
+      "category": "Development",
+      "executableName": "rollerterm"
     }
   }
 }

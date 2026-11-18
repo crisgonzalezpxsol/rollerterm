@@ -285,7 +285,10 @@ function createWindow() {
     minWidth: 480,
     minHeight: 300,
     backgroundColor: "#13112b",
-    titleBarStyle: "hiddenInset",
+    // En macOS la barra de título propia convive con los semáforos; en Linux se usa el marco del sistema.
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hiddenInset" as const }
+      : { icon: join(__dirname, "icon.png"), autoHideMenuBar: true }),
     webPreferences: {
       preload: join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -296,6 +299,10 @@ function createWindow() {
     },
   });
   win.loadFile(join(__dirname, "index.html"));
+  // Fuera de macOS no hay semáforos dentro de la barra: sin el hueco a la izquierda.
+  if (process.platform !== "darwin") {
+    win.webContents.on("dom-ready", () => void win?.webContents.insertCSS("#titlebar { padding-left: 8px; }"));
+  }
   // Todos los links (terminal, Unirme, correos) se abren en el navegador configurado, nunca en la app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     settings.openUrl(url);
