@@ -47,6 +47,14 @@ npm run spike:tauri:build    # solo compila
 
 La primera compilación tarda unos minutos; después es incremental. El binario queda en `tauri-spike/src-tauri/target/release/rollerterm-tauri`.
 
+## Instalar como app
+
+```sh
+npm run spike:tauri:install
+```
+
+Compila y la agrega al menú de aplicaciones como «rollerterm (Tauri)», al lado de la versión Electron (no la reemplaza). Queda en `~/.local/opt/rollerterm-tauri`. Para actualizarla después de un cambio, se corre lo mismo; se puede reinstalar con la app abierta y el cambio se ve al reabrirla.
+
 ## Medir
 
 ```sh

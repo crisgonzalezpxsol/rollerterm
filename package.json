@@ -16,7 +16,8 @@
     "dist:linux": "node build.mjs && electron-builder --linux dir",
     "install-linux": "npm run dist:linux && sh scripts/install-linux.sh",
     "spike:tauri": "node tauri-spike/build-frontend.mjs && cargo run --release --manifest-path tauri-spike/src-tauri/Cargo.toml",
-    "spike:tauri:build": "node tauri-spike/build-frontend.mjs && cargo build --release --manifest-path tauri-spike/src-tauri/Cargo.toml"
+    "spike:tauri:build": "node tauri-spike/build-frontend.mjs && cargo build --release --manifest-path tauri-spike/src-tauri/Cargo.toml",
+    "spike:tauri:install": "npm run spike:tauri:build && sh tauri-spike/install-linux.sh"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.1",
