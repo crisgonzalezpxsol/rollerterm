@@ -3,3 +3,6 @@ dist/
 out/
 .DS_Store
 *.log
+tauri-spike/dist/
+tauri-spike/src-tauri/target/
+tauri-spike/src-tauri/gen/
