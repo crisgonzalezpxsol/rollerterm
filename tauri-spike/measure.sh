@@ -4,7 +4,8 @@
 #   sh tauri-spike/measure.sh rollerterm-tauri
 #   sh tauri-spike/measure.sh rollerterm        # la versión Electron, para comparar
 name="${1:?uso: measure.sh <nombre-del-proceso>}"
-root=$(pgrep -xo "$name") || { echo "no está corriendo: $name"; exit 1; }
+# /proc/<pid>/comm guarda solo 15 caracteres del nombre.
+root=$(pgrep -xo "$(printf %.15s "$name")") || { echo "no está corriendo: $name"; exit 1; }
 
 tree() {
   echo "$1"
