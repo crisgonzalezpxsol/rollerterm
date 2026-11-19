@@ -90,11 +90,16 @@ pub fn sys_stats(mon: State<'_, SysMon>) -> SysStats {
     let sys = guard.get_or_insert_with(sysinfo::System::new);
     sys.refresh_cpu_usage();
     sys.refresh_memory();
+    // En macOS, sysinfo 0.37 devuelve available_memory() = 0: la disponible sale de total − usada.
+    let mem_available = match sys.available_memory() {
+        0 => sys.total_memory().saturating_sub(sys.used_memory()),
+        n => n,
+    };
     SysStats {
         cpu: (!first).then(|| sys.global_cpu_usage() as f64),
         cores: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
         mem_total: sys.total_memory(),
-        mem_available: sys.available_memory(),
+        mem_available,
         swap_total: sys.total_swap(),
         swap_free: sys.free_swap(),
         load1: sysinfo::System::load_average().one,
