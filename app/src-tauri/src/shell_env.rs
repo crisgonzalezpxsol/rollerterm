@@ -41,7 +41,7 @@ pub async fn find_command(name: &str) -> Option<Command> {
     for v in INHERITED_CLAUDE_VARS {
         env.remove(v);
     }
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
+    let shell = crate::util::default_shell();
     let script = format!(r#"printf "__RT__%s__RT__%s__RT__" "$PATH" "$(command -v {name})""#);
     let out = exec(&shell, &["-ilc".into(), script], &env, None, "", Duration::from_secs(15))
         .await

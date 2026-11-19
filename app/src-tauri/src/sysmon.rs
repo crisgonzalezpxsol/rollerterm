@@ -1,4 +1,5 @@
-// Monitor de sistema para la cabecera: CPU, RAM y swap leídos de /proc (sin procesos extra).
+// Monitor de sistema para la cabecera: CPU, RAM y swap. En Linux se leen de /proc (sin
+// procesos extra); en macOS, con sysinfo.
 
 use serde::Serialize;
 use std::sync::Mutex;
@@ -7,7 +8,11 @@ use tauri::State;
 #[derive(Default)]
 pub struct SysMon {
     /// Contadores de CPU de la lectura anterior (tiempo ocioso, total), para sacar el % entre dos.
+    #[cfg(not(target_os = "macos"))]
     prev: Mutex<Option<(u64, u64)>>,
+    /// sysinfo saca el % de CPU entre dos refrescos del mismo System.
+    #[cfg(target_os = "macos")]
+    sys: Mutex<Option<sysinfo::System>>,
 }
 
 #[derive(Serialize)]
@@ -26,6 +31,7 @@ pub struct SysStats {
 }
 
 /// (ocioso, total) de la línea "cpu" de /proc/stat.
+#[cfg(not(target_os = "macos"))]
 fn cpu_times() -> Option<(u64, u64)> {
     let stat = std::fs::read_to_string("/proc/stat").ok()?;
     let line = stat.lines().next()?;
@@ -36,6 +42,7 @@ fn cpu_times() -> Option<(u64, u64)> {
     Some((idle, total))
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub fn sys_stats(mon: State<'_, SysMon>) -> SysStats {
     let now = cpu_times();
@@ -72,5 +79,24 @@ pub fn sys_stats(mon: State<'_, SysMon>) -> SysStats {
         swap_total: kb("SwapTotal:"),
         swap_free: kb("SwapFree:"),
         load1,
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn sys_stats(mon: State<'_, SysMon>) -> SysStats {
+    let mut guard = mon.sys.lock().unwrap();
+    let first = guard.is_none();
+    let sys = guard.get_or_insert_with(sysinfo::System::new);
+    sys.refresh_cpu_usage();
+    sys.refresh_memory();
+    SysStats {
+        cpu: (!first).then(|| sys.global_cpu_usage() as f64),
+        cores: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
+        mem_total: sys.total_memory(),
+        mem_available: sys.available_memory(),
+        swap_total: sys.total_swap(),
+        swap_free: sys.free_swap(),
+        load1: sysinfo::System::load_average().one,
     }
 }

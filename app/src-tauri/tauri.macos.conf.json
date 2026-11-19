@@ -1,0 +1,17 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "rollerterm",
+        "width": 1100,
+        "height": 700,
+        "minWidth": 480,
+        "minHeight": 300,
+        "backgroundColor": "#13112b",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ]
+  }
+}

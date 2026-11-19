@@ -161,8 +161,26 @@ window.open = ((url?: string | URL) => {
   return null;
 }) as typeof window.open;
 
-// ---------- atajos del menú ----------
-// En Electron los dispara el menú de la app; acá se escuchan en la ventana, antes que xterm.
+// ---------- menú, atajos y barra de título ----------
+const IS_MAC = /Mac/.test(navigator.platform);
+
+// En macOS hay menú nativo (menu.rs) y sus opciones llegan como evento "menu".
+on<MenuCommand>("menu", (cmd) => menuCb(cmd));
+
+if (IS_MAC) {
+  // La barra de título propia convive con los semáforos (hueco a la izquierda, ya en styles.css).
+  // WebKit en macOS no entiende -webkit-app-region: se arrastra con el atributo de Tauri.
+  const mark = () => document.getElementById("titlebar")?.setAttribute("data-tauri-drag-region", "");
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mark);
+  else mark();
+} else {
+  // Fuera de macOS se usa el marco del sistema: sin el hueco de los semáforos.
+  const style = document.createElement("style");
+  style.textContent = "#titlebar { padding-left: 8px; }";
+  document.head.appendChild(style);
+}
+
+// En Linux no hay barra de menú: los atajos se escuchan en la ventana, antes que xterm.
 // Mismas teclas que la versión Electron en Linux (Ctrl+Shift para no pisar a la shell).
 const SHIFT_KEYS: Record<string, MenuCommand> = {
   KeyT: "new-tab",
@@ -180,7 +198,7 @@ const SHIFT_KEYS: Record<string, MenuCommand> = {
 window.addEventListener(
   "keydown",
   (e) => {
-    if (!e.ctrlKey || e.altKey || e.metaKey) return;
+    if (IS_MAC || !e.ctrlKey || e.altKey || e.metaKey) return;
     let cmd: MenuCommand | undefined;
     if (e.shiftKey) cmd = SHIFT_KEYS[e.code];
     else if (e.code === "Comma") cmd = "open-settings";

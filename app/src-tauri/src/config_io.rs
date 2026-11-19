@@ -73,7 +73,7 @@ pub async fn config_export(app: AppHandle, ui: Value) -> Result<Option<String>, 
         .blocking_show();
     if !listo {
         if let Some(dir) = path.parent() {
-            let _ = std::process::Command::new("xdg-open").arg(dir).spawn();
+            crate::util::open_external(&dir.to_string_lossy());
         }
     }
     Ok(Some(path.to_string_lossy().into_owned()))

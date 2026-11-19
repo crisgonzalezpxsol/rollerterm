@@ -33,12 +33,25 @@ pub struct Ptys {
 }
 
 impl Ptys {
-    /// Directorio actual de la shell (en Linux sale de /proc, igual que en Electron).
+    /// Directorio actual de la shell: en Linux sale de /proc; en macOS, de lsof (como node-pty en Electron).
     pub fn cwd(&self, id: &str) -> Option<String> {
         let pid = self.map.lock().unwrap().get(id)?.child.process_id()?;
-        std::fs::read_link(format!("/proc/{pid}/cwd"))
-            .ok()
-            .map(|p| p.to_string_lossy().into_owned())
+        #[cfg(target_os = "macos")]
+        {
+            let out = std::process::Command::new("/usr/sbin/lsof")
+                .args(["-a", "-p", &pid.to_string(), "-d", "cwd", "-Fn"])
+                .output()
+                .ok()?;
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .find_map(|l| l.strip_prefix('n').map(String::from))
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            std::fs::read_link(format!("/proc/{pid}/cwd"))
+                .ok()
+                .map(|p| p.to_string_lossy().into_owned())
+        }
     }
 
     pub fn kill_all(&self) {
@@ -69,7 +82,7 @@ pub fn pty_create(
         kill_entry(old);
     }
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into());
+    let shell = crate::util::default_shell();
     let home = std::env::var("HOME").unwrap_or_else(|_| "/".into());
     let dir = cwd.filter(|d| !d.is_empty() && Path::new(d).is_dir()).unwrap_or(home);
 

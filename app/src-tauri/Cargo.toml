@@ -27,3 +27,7 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# En macOS no hay /proc: CPU y memoria salen de sysinfo (solo se compila ahí).
+[target.'cfg(target_os = "macos")'.dependencies]
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }

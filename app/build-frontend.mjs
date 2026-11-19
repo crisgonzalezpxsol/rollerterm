@@ -1,13 +1,13 @@
 // Empaqueta la interfaz de rollerterm (src/renderer/) para Tauri, con el reemplazo de
-// window.rollerterm delante. Se corre desde la raíz del repo: node tauri-spike/build-frontend.mjs
+// window.rollerterm delante. Se corre desde la raíz del repo: node app/build-frontend.mjs
 import { build } from "esbuild";
 import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 
-const out = "tauri-spike/dist";
+const out = "app/dist";
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 await build({
-  entryPoints: ["tauri-spike/frontend/main.ts"],
+  entryPoints: ["app/frontend/main.ts"],
   // Mismos nombres que en Electron: index.html pide renderer.js y renderer.css.
   outfile: `${out}/renderer.js`,
   bundle: true,

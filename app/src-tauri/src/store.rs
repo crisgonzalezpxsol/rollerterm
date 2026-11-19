@@ -13,10 +13,17 @@ use tauri::State;
 
 const FILES: [&str; 5] = ["session.json", "settings.json", "notes.json", "mail.json", "reminders.json"];
 
+/// Donde Electron guarda sus datos: ~/.config en Linux, ~/Library/Application Support en macOS.
+/// XDG_CONFIG_HOME manda en los dos (sirve para probar con una copia aparte).
 fn config_home() -> PathBuf {
-    std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(".config"))
+    let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
+    std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| {
+        if cfg!(target_os = "macos") {
+            home.join("Library/Application Support")
+        } else {
+            home.join(".config")
+        }
+    })
 }
 
 /// Carpeta de datos de la versión Tauri.

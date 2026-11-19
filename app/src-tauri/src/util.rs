@@ -86,3 +86,14 @@ pub fn parse_iso_ms(s: &str) -> Option<i64> {
     }
     None
 }
+
+/// Abre un link o una carpeta con la app del sistema (xdg-open en Linux, open en macOS).
+pub fn open_external(target: &str) {
+    let opener = if cfg!(target_os = "macos") { "open" } else { "xdg-open" };
+    let _ = std::process::Command::new(opener).arg(target).spawn();
+}
+
+/// Shell por defecto si no hay $SHELL: zsh en macOS, bash en Linux.
+pub fn default_shell() -> String {
+    std::env::var("SHELL").unwrap_or_else(|_| if cfg!(target_os = "macos") { "/bin/zsh" } else { "/bin/bash" }.into())
+}

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Suma la memoria PSS (la compartida se reparte entre procesos, así no se cuenta
 # dos veces) de un proceso y todos sus hijos, excluyendo las shells de las pestañas.
-#   sh tauri-spike/measure.sh rollerterm-tauri
-#   sh tauri-spike/measure.sh rollerterm        # la versión Electron, para comparar
+#   sh app/measure.sh rollerterm-tauri
+#   sh app/measure.sh rollerterm        # la versión Electron, para comparar
 name="${1:?uso: measure.sh <nombre-del-proceso>}"
 # /proc/<pid>/comm guarda solo 15 caracteres del nombre.
 root=$(pgrep -xo "$(printf %.15s "$name")") || { echo "no está corriendo: $name"; exit 1; }

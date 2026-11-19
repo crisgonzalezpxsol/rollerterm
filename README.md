@@ -22,8 +22,9 @@ Lleva unos 10 minutos. Se hace una sola vez.
 
 | Qué | Cómo verificar | Si falta |
 | --- | --- | --- |
-| macOS | — | La app es solo para Mac. |
+| macOS o Linux (Ubuntu 24.04 probado) | — | En Linux además: `sudo apt install libwebkit2gtk-4.1-dev build-essential libssl-dev libayatana-appindicator3-dev librsvg2-dev` |
 | Herramientas de línea de comandos de Xcode (git, compilador) | `xcode-select -p` muestra una ruta | `xcode-select --install` |
+| Rust | `cargo --version` | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` y abrí una terminal nueva |
 | Node.js 20 o más nuevo | `node -v` | Bajalo de [nodejs.org](https://nodejs.org) (versión LTS) o `brew install node` |
 | Claude Code | `claude --version` | `curl -fsSL https://claude.ai/install.sh \| bash` y abrí una terminal nueva |
 | Cuenta de Claude (Pro, Max, Team o Enterprise) | — | La agenda usa los conectores de claude.ai; una API key sola no alcanza. |
@@ -63,7 +64,7 @@ funciona igual.
 git clone https://github.com/crisgonzalezpxsol/rollerterm.git
 cd rollerterm
 npm install    # instala dependencias y compila la parte nativa de la terminal
-npm start      # compila y abre la app
+npm start      # compila y abre la app (la primera vez Rust tarda unos minutos)
 ```
 
 La primera vez, macOS pregunta si la app puede mandar **notificaciones**: decí que sí, porque si no
@@ -75,13 +76,17 @@ A los ~15–30 segundos la agenda y el correo tienen que mostrar **● Conectado
 ### 5. (Opcional) Instalarla como app
 
 ```bash
-npm run install-app   # arma rollerterm.app y la copia a /Applications
+npm run install-app   # macOS: «rollerterm Tauri.app» en /Applications · Linux: «rollerterm (Tauri)» en el menú
 ```
 
-Desde ahí se abre como cualquier app (Spotlight, Launchpad, Dock). Después de cambiar el código,
-volvé a correr `npm run install-app`. Si solo querés el `.app` sin instalarlo: `npm run dist`
-(queda en `out/mac-arm64/`). Usa la misma carpeta de datos que `npm start`, así que pestañas,
-notas y configuración se comparten.
+Desde ahí se abre como cualquier app (Spotlight, Launchpad, Dock, o el menú de aplicaciones en
+Linux). Después de cambiar el código, volvé a correr `npm run install-app`. Usa la misma carpeta de
+datos que `npm start`, así que pestañas, notas y configuración se comparten.
+
+La app está hecha con [Tauri](https://tauri.app) (Rust + el navegador del sistema): pesa ~11 MB y
+usa cerca de la mitad de memoria que la versión Electron. Detalles en [`app/README.md`](app/README.md).
+La versión Electron sigue en el repo mientras tanto: `npm run electron:dev` la abre y
+`npm run electron:install` (o `electron:install-linux`) la instala, con sus datos aparte.
 
 ## Uso
 

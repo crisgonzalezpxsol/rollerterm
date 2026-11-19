@@ -3,7 +3,7 @@
 set -e
 SRC="out/linux-unpacked"
 DEST="$HOME/.local/opt/rollerterm"
-[ -x "$SRC/rollerterm" ] || { echo "Falta $SRC; corré npm run dist:linux"; exit 1; }
+[ -x "$SRC/rollerterm" ] || { echo "Falta $SRC; corré npm run electron:dist:linux"; exit 1; }
 
 rm -rf "$DEST"
 mkdir -p "$DEST" "$HOME/.local/bin" "$HOME/.local/share/applications"

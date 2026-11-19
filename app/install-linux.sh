@@ -1,9 +1,9 @@
 #!/bin/sh
 # Instala la versión Tauri en ~/.local y la agrega al menú de aplicaciones como
 # «rollerterm (Tauri)», al lado de la versión Electron (no la reemplaza).
-# Se corre desde la raíz del repo: npm run spike:tauri:install
+# Se corre desde la raíz del repo: npm run install-app
 set -e
-BIN="tauri-spike/src-tauri/target/release/rollerterm-tauri"
+BIN="app/src-tauri/target/release/rollerterm-tauri"
 DEST="$HOME/.local/opt/rollerterm-tauri"
 [ -x "$BIN" ] || { echo "Falta $BIN; corré npm run spike:tauri:build"; exit 1; }
 

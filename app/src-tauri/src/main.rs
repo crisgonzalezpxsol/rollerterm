@@ -10,6 +10,7 @@ mod config_io;
 mod mail;
 mod mcp_client;
 mod mcp_server;
+mod menu;
 mod notify;
 mod pty;
 mod railway;
@@ -53,7 +54,7 @@ async fn pick_folder(app: tauri::AppHandle, default_path: Option<String>) -> Opt
 #[tauri::command]
 fn open_url(url: String) {
     if url.starts_with("http://") || url.starts_with("https://") {
-        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+        crate::util::open_external(&url);
     }
 }
 
@@ -65,6 +66,13 @@ fn js_log(message: String) {
 
 #[tauri::command]
 fn quit(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+/// Salir desde el menú de macOS (Cmd+Q): guarda las carpetas de las pestañas, como al cerrar la ventana.
+pub(crate) fn quit_saving(app: &tauri::AppHandle) {
+    save_with_current_cwds(app);
+    app.state::<Ptys>().kill_all();
     app.exit(0);
 }
 
@@ -269,6 +277,9 @@ fn main() {
         .manage(activity.clone())
         .setup(move |app| {
             let handle = app.handle().clone();
+            if cfg!(target_os = "macos") {
+                menu::install(&handle)?;
+            }
             let calendar = CalendarSync::new(claude.clone(), handle.clone());
             let mail = MailSync::new(&dir, claude.clone(), activity.clone(), handle.clone());
             calendar.start();
